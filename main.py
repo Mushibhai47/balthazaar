@@ -16,7 +16,10 @@ with app.app_context():
 @app.route("/")
 def dashboard():
     clients = Client.query.order_by(Client.created_at.desc()).all()
-    return render_template("dashboard.html", clients=clients)
+    total_reports = Report.query.count()
+    total_competitors = Competitor.query.count()
+    total_queries = Query.query.count()
+    return render_template("dashboard.html", clients=clients, total_reports=total_reports, total_competitors=total_competitors, total_queries=total_queries)
 
 
 # --- New Client + Intake Form ---
@@ -120,7 +123,8 @@ def new_client():
 @app.route("/clients/<int:client_id>")
 def view_client(client_id):
     client = Client.query.get_or_404(client_id)
-    return render_template("client_detail.html", client=client)
+    report_count = sum(len(q.reports) for q in client.queries)
+    return render_template("client_detail.html", client=client, report_count=report_count)
 
 
 # --- Edit Client ---

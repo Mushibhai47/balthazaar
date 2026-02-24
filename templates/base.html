@@ -5,42 +5,80 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Balthazaar{% endblock %} | Competitive Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
                     colors: {
-                        brand: { DEFAULT: '#820263', light: '#D90368', dark: '#4a0139' },
-                        accent: '#F75C03',
-                        surface: '#f8f9fa',
+                        brand: { 50: '#fdf2f8', 100: '#fce7f3', 200: '#fbcfe8', 300: '#f9a8d4', 400: '#f472b6', 500: '#D90368', 600: '#820263', 700: '#4a0139', DEFAULT: '#820263', light: '#D90368', dark: '#4a0139' },
+                        accent: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 300: '#fdba74', 400: '#fb923c', 500: '#F75C03', DEFAULT: '#F75C03' },
+                        surface: { DEFAULT: '#f1f5f9', 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0' },
+                        sidebar: { DEFAULT: '#1e1b2e', light: '#2d2a3e', hover: '#3d3a4e' },
                     }
                 }
             }
         }
     </script>
     <style>
-        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .sidebar-link { transition: all 0.2s ease; }
+        .sidebar-link:hover { background: rgba(255,255,255,0.08); }
+        .sidebar-link.active { background: rgba(217,3,104,0.2); border-right: 3px solid #D90368; }
+        .card-hover { transition: all 0.2s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
+        .gradient-header { background: linear-gradient(135deg, #820263 0%, #D90368 50%, #F75C03 100%); }
+        .stat-gradient-1 { background: linear-gradient(135deg, #820263, #D90368); }
+        .stat-gradient-2 { background: linear-gradient(135deg, #D90368, #f472b6); }
+        .stat-gradient-3 { background: linear-gradient(135deg, #F75C03, #fb923c); }
+        .stat-gradient-4 { background: linear-gradient(135deg, #4a0139, #820263); }
+        .glass-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.4s ease forwards; }
+        .flash-msg { animation: fadeIn 0.3s ease forwards; }
     </style>
 </head>
 <body class="bg-surface min-h-screen">
-    <nav class="bg-brand text-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <a href="/" class="text-2xl font-bold tracking-wide">Balthazaar</a>
-            <div class="flex gap-6 text-sm font-medium">
-                <a href="/" class="hover:text-accent transition">Dashboard</a>
-                <a href="/clients/new" class="hover:text-accent transition">+ New Client</a>
+    <!-- Top Navigation -->
+    <nav class="gradient-header text-white shadow-xl sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur">
+                    <span class="text-xl font-black">B</span>
+                </div>
+                <div>
+                    <a href="/" class="text-xl font-bold tracking-tight">Balthazaar</a>
+                    <p class="text-[10px] text-white/60 tracking-widest uppercase">Competitive Intelligence</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition {% block nav_dashboard %}{% endblock %}">
+                    <span class="material-symbols-outlined text-[18px]">dashboard</span>
+                    Dashboard
+                </a>
+                <a href="/clients/new" class="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-semibold transition backdrop-blur">
+                    <span class="material-symbols-outlined text-[18px]">add</span>
+                    New Client
+                </a>
             </div>
         </div>
     </nav>
 
+    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-    <div class="max-w-7xl mx-auto px-4 mt-4">
+    <div class="max-w-7xl mx-auto px-6 mt-4">
         {% for category, message in messages %}
-        <div class="p-3 rounded-lg mb-2 text-sm
-            {% if category == 'success' %}bg-green-100 text-green-800 border border-green-300
-            {% elif category == 'error' %}bg-red-100 text-red-800 border border-red-300
-            {% else %}bg-blue-100 text-blue-800 border border-blue-300{% endif %}">
+        <div class="flash-msg flex items-center gap-3 p-4 rounded-xl mb-3 text-sm shadow-sm
+            {% if category == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-200
+            {% elif category == 'error' %}bg-red-50 text-red-800 border border-red-200
+            {% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+            <span class="material-symbols-outlined text-[20px]">
+                {% if category == 'success' %}check_circle{% elif category == 'error' %}error{% else %}info{% endif %}
+            </span>
             {{ message }}
         </div>
         {% endfor %}
@@ -48,12 +86,22 @@
     {% endif %}
     {% endwith %}
 
-    <main class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="text-center text-xs text-gray-400 py-6">
-        Balthazaar Competitive Intelligence &copy; 2026
+    <!-- Footer -->
+    <footer class="border-t border-gray-200 mt-12">
+        <div class="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 stat-gradient-1 rounded-md flex items-center justify-center">
+                    <span class="text-white text-[10px] font-black">B</span>
+                </div>
+                <span class="text-xs text-gray-400">Balthazaar Competitive Intelligence</span>
+            </div>
+            <span class="text-xs text-gray-400">&copy; 2026 All rights reserved</span>
+        </div>
     </footer>
 
     {% block scripts %}{% endblock %}
