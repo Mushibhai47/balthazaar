@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% block title %}New Client{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-xl shadow-md p-8">
+        <h1 class="text-3xl font-bold text-brand mb-2">New Client Setup</h1>
+        <p class="text-gray-500 mb-8">Enter client details to begin competitive intelligence tracking.</p>
+
+        <form method="POST" action="/clients/new" id="intakeForm">
+            <!-- Section 1: Client Info -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold text-brand-light border-b border-gray-200 pb-2 mb-4">1. Client Information</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Client Name *</label>
+                        <input type="text" name="client_name" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+                            placeholder="e.g. Microsoft">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Client Website *</label>
+                        <input type="url" name="client_website" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+                            placeholder="https://example.com">
+                    </div>
+                </div>
+
+                <!-- Social Media Handles -->
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Social Media Handles</label>
+                    <div id="socialHandles">
+                        <div class="flex gap-2 mb-2">
+                            <select name="social_platform[]" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="linkedin">LinkedIn</option>
+                                <option value="x">X (Twitter)</option>
+                                <option value="instagram">Instagram</option>
+                                <option value="facebook">Facebook</option>
+                                <option value="tiktok">TikTok</option>
+                                <option value="reddit">Reddit</option>
+                            </select>
+                            <input type="text" name="social_handle[]"
+                                class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                placeholder="Handle or URL">
+                        </div>
+                    </div>
+                    <button type="button" onclick="addSocialHandle('socialHandles', 'social_platform[]', 'social_handle[]')"
+                        class="text-sm text-brand-light hover:text-brand font-medium">+ Add another handle</button>
+                </div>
+            </div>
+
+            <!-- Section 2: Reporting -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold text-brand-light border-b border-gray-200 pb-2 mb-4">2. Reporting Settings</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Report Frequency *</label>
+                        <select name="frequency" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand outline-none">
+                            <option value="monthly">Monthly</option>
+                            <option value="fortnightly">Fortnightly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Auto-Run Reports</label>
+                        <label class="flex items-center gap-2 mt-2">
+                            <input type="checkbox" name="auto_run" value="1"
+                                class="w-4 h-4 text-brand rounded focus:ring-brand">
+                            <span class="text-sm text-gray-600">Automatically generate reports on schedule</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Period Start</label>
+                        <input type="date" name="period_start"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Period End</label>
+                        <input type="date" name="period_end"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 3: Competitors -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold text-brand-light border-b border-gray-200 pb-2 mb-4">3. Competitors to Track</h2>
+
+                <div id="competitors">
+                    <div class="bg-gray-50 rounded-lg p-4 mb-3 competitor-block">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-sm font-semibold text-gray-600">Competitor 1</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Name</label>
+                                <input type="text" name="comp_name[]"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                    placeholder="Competitor name">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Website *</label>
+                                <input type="url" name="comp_website[]" required
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                    placeholder="https://competitor.com">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">YouTube URL</label>
+                                <input type="url" name="comp_youtube[]"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                    placeholder="https://youtube.com/@channel">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Vimeo URL</label>
+                                <input type="url" name="comp_vimeo[]"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                    placeholder="https://vimeo.com/channel">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs text-gray-500 mb-1">Review Page (Trustpilot, Google Reviews, etc.)</label>
+                                <input type="url" name="comp_review[]"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                    placeholder="https://trustpilot.com/review/competitor.com">
+                            </div>
+                        </div>
+                        <!-- Competitor Social Handles -->
+                        <div class="mt-3">
+                            <label class="block text-xs text-gray-500 mb-1">Social Media Handles</label>
+                            <div class="comp-socials">
+                                <div class="flex gap-2 mb-2">
+                                    <select name="comp_social_platform_0[]" class="border border-gray-300 rounded-lg px-2 py-1 text-xs">
+                                        <option value="linkedin">LinkedIn</option>
+                                        <option value="x">X (Twitter)</option>
+                                        <option value="instagram">Instagram</option>
+                                        <option value="facebook">Facebook</option>
+                                        <option value="tiktok">TikTok</option>
+                                        <option value="reddit">Reddit</option>
+                                    </select>
+                                    <input type="text" name="comp_social_handle_0[]"
+                                        class="flex-1 border border-gray-300 rounded-lg px-2 py-1 text-xs"
+                                        placeholder="Handle or URL">
+                                </div>
+                            </div>
+                            <button type="button" onclick="addCompSocial(this)"
+                                class="text-xs text-brand-light hover:text-brand font-medium">+ Add handle</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" onclick="addCompetitor()"
+                    class="text-sm text-accent hover:text-brand font-semibold">+ Add another competitor</button>
+                <p class="text-xs text-gray-400 mt-1">You can add up to 50 competitors.</p>
+            </div>
+
+            <!-- Section 4: Keywords -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold text-brand-light border-b border-gray-200 pb-2 mb-4">4. Keywords</h2>
+                <p class="text-sm text-gray-500 mb-3">Enter keywords to track (one per line). These will be monitored across Google, ChatGPT, Gemini, YouTube, TikTok, and Instagram.</p>
+                <textarea name="keywords" rows="8"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+                    placeholder="keyword 1&#10;keyword 2&#10;keyword 3&#10;..."></textarea>
+                <p class="text-xs text-gray-400 mt-1">Up to 1,000 keywords. One per line.</p>
+            </div>
+
+            <!-- Section 5: Countries -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold text-brand-light border-b border-gray-200 pb-2 mb-4">5. Country / Countries</h2>
+                <p class="text-sm text-gray-500 mb-3">Select countries to generate reports for. Each country generates a separate report.</p>
+                <div id="countries">
+                    <div class="flex gap-2 mb-2">
+                        <select name="countries[]" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="">-- Select Country --</option>
+                            <option value="Singapore">Singapore</option>
+                            <option value="Malaysia">Malaysia</option>
+                            <option value="Thailand">Thailand</option>
+                            <option value="Indonesia">Indonesia</option>
+                            <option value="Philippines">Philippines</option>
+                            <option value="Vietnam">Vietnam</option>
+                            <option value="Australia">Australia</option>
+                            <option value="New Zealand">New Zealand</option>
+                            <option value="United Kingdom">United Kingdom</option>
+                            <option value="United States">United States</option>
+                            <option value="Canada">Canada</option>
+                            <option value="France">France</option>
+                            <option value="Germany">Germany</option>
+                            <option value="Japan">Japan</option>
+                            <option value="South Korea">South Korea</option>
+                            <option value="India">India</option>
+                            <option value="UAE">UAE</option>
+                            <option value="Saudi Arabia">Saudi Arabia</option>
+                            <option value="Hong Kong">Hong Kong</option>
+                            <option value="Taiwan">Taiwan</option>
+                            <option value="China">China</option>
+                            <option value="Brazil">Brazil</option>
+                            <option value="Mexico">Mexico</option>
+                            <option value="South Africa">South Africa</option>
+                            <option value="Nigeria">Nigeria</option>
+                            <option value="Egypt">Egypt</option>
+                            <option value="Pakistan">Pakistan</option>
+                            <option value="Bangladesh">Bangladesh</option>
+                            <option value="Italy">Italy</option>
+                            <option value="Spain">Spain</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="button" onclick="addCountry()"
+                    class="text-sm text-brand-light hover:text-brand font-medium">+ Add another country</button>
+                <p class="text-xs text-gray-400 mt-1">Min 1, up to 100 countries.</p>
+            </div>
+
+            <!-- Section 6: Subscription -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold text-brand-light border-b border-gray-200 pb-2 mb-4">6. Subscription & Contact</h2>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Subscription Tier *</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-3 cursor-pointer border border-gray-200 hover:border-brand transition">
+                            <input type="radio" name="subscription_tier" value="trial" required class="text-brand focus:ring-brand">
+                            <div>
+                                <span class="text-sm font-medium">Trial</span>
+                                <p class="text-xs text-gray-400">1 report</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-3 cursor-pointer border border-gray-200 hover:border-brand transition">
+                            <input type="radio" name="subscription_tier" value="6month" class="text-brand focus:ring-brand">
+                            <div>
+                                <span class="text-sm font-medium">6-Month</span>
+                                <p class="text-xs text-gray-400">Subscription</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-3 cursor-pointer border border-gray-200 hover:border-brand transition">
+                            <input type="radio" name="subscription_tier" value="1year" class="text-brand focus:ring-brand">
+                            <div>
+                                <span class="text-sm font-medium">1-Year</span>
+                                <p class="text-xs text-gray-400">Subscription</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Contact Name *</label>
+                        <input type="text" name="contact_name" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+                            placeholder="Your name">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Contact Email *</label>
+                        <input type="email" name="contact_email" required
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+                            placeholder="email@company.com">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confirmation -->
+            <div class="mb-8 bg-gray-50 rounded-lg p-4">
+                <label class="flex items-start gap-3">
+                    <input type="checkbox" name="confirm_accuracy" required class="w-4 h-4 mt-0.5 text-brand rounded focus:ring-brand">
+                    <span class="text-sm text-gray-600">I confirm that all information provided is accurate and understand that pricing may deviate based on the scope of data tracked. Subscriptions are auto-renewable and can be cancelled with 31 days advance notice.</span>
+                </label>
+            </div>
+
+            <div class="flex gap-4">
+                <button type="submit"
+                    class="bg-brand hover:bg-brand-dark text-white font-semibold px-8 py-3 rounded-lg transition shadow-md">
+                    Save Client & Create Query
+                </button>
+                <a href="/"
+                    class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-8 py-3 rounded-lg transition">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let compCount = 1;
+
+function addSocialHandle(containerId, platformName, handleName) {
+    const container = document.getElementById(containerId);
+    const div = document.createElement('div');
+    div.className = 'flex gap-2 mb-2';
+    div.innerHTML = `
+        <select name="${platformName}" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <option value="linkedin">LinkedIn</option>
+            <option value="x">X (Twitter)</option>
+            <option value="instagram">Instagram</option>
+            <option value="facebook">Facebook</option>
+            <option value="tiktok">TikTok</option>
+            <option value="reddit">Reddit</option>
+        </select>
+        <input type="text" name="${handleName}" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Handle or URL">
+        <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-sm px-2">Remove</button>
+    `;
+    container.appendChild(div);
+}
+
+function addCompSocial(btn) {
+    const container = btn.previousElementSibling;
+    const compIdx = document.querySelectorAll('.competitor-block').length - 1;
+    const div = document.createElement('div');
+    div.className = 'flex gap-2 mb-2';
+    div.innerHTML = `
+        <select name="comp_social_platform_${compIdx}[]" class="border border-gray-300 rounded-lg px-2 py-1 text-xs">
+            <option value="linkedin">LinkedIn</option>
+            <option value="x">X (Twitter)</option>
+            <option value="instagram">Instagram</option>
+            <option value="facebook">Facebook</option>
+            <option value="tiktok">TikTok</option>
+            <option value="reddit">Reddit</option>
+        </select>
+        <input type="text" name="comp_social_handle_${compIdx}[]" class="flex-1 border border-gray-300 rounded-lg px-2 py-1 text-xs" placeholder="Handle or URL">
+        <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-xs px-1">X</button>
+    `;
+    container.appendChild(div);
+}
+
+function addCompetitor() {
+    compCount++;
+    if (compCount > 50) { alert('Maximum 50 competitors.'); return; }
+    const container = document.getElementById('competitors');
+    const div = document.createElement('div');
+    div.className = 'bg-gray-50 rounded-lg p-4 mb-3 competitor-block';
+    div.innerHTML = `
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-semibold text-gray-600">Competitor ${compCount}</span>
+            <button type="button" onclick="this.closest('.competitor-block').remove()" class="text-red-400 hover:text-red-600 text-xs">Remove</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Name</label>
+                <input type="text" name="comp_name[]" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Competitor name">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Website *</label>
+                <input type="url" name="comp_website[]" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="https://competitor.com">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">YouTube URL</label>
+                <input type="url" name="comp_youtube[]" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="https://youtube.com/@channel">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Vimeo URL</label>
+                <input type="url" name="comp_vimeo[]" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="https://vimeo.com/channel">
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs text-gray-500 mb-1">Review Page URL</label>
+                <input type="url" name="comp_review[]" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="https://trustpilot.com/review/competitor.com">
+            </div>
+        </div>
+        <div class="mt-3">
+            <label class="block text-xs text-gray-500 mb-1">Social Media Handles</label>
+            <div class="comp-socials">
+                <div class="flex gap-2 mb-2">
+                    <select name="comp_social_platform_${compCount - 1}[]" class="border border-gray-300 rounded-lg px-2 py-1 text-xs">
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="x">X (Twitter)</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="tiktok">TikTok</option>
+                        <option value="reddit">Reddit</option>
+                    </select>
+                    <input type="text" name="comp_social_handle_${compCount - 1}[]" class="flex-1 border border-gray-300 rounded-lg px-2 py-1 text-xs" placeholder="Handle or URL">
+                </div>
+            </div>
+            <button type="button" onclick="addCompSocial(this)" class="text-xs text-brand-light hover:text-brand font-medium">+ Add handle</button>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+function addCountry() {
+    const container = document.getElementById('countries');
+    const selects = container.querySelectorAll('select');
+    if (selects.length >= 100) { alert('Maximum 100 countries.'); return; }
+    const firstSelect = container.querySelector('select');
+    const div = document.createElement('div');
+    div.className = 'flex gap-2 mb-2';
+    div.innerHTML = `
+        ${firstSelect.outerHTML.replace('-- Select Country --', '-- Select Country --')}
+        <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-sm px-2">Remove</button>
+    `;
+    container.appendChild(div);
+}
+</script>
+{% endblock %}
