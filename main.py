@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
+from sqlalchemy import func
 from database.models import db, Client, Competitor, Query, Report
 from config import Config
 from datetime import datetime
@@ -16,9 +17,9 @@ with app.app_context():
 @app.route("/")
 def dashboard():
     clients = Client.query.order_by(Client.created_at.desc()).all()
-    total_reports = Report.query.count()
-    total_competitors = Competitor.query.count()
-    total_queries = Query.query.count()
+    total_reports = db.session.query(func.count(Report.id)).scalar() or 0
+    total_competitors = db.session.query(func.count(Competitor.id)).scalar() or 0
+    total_queries = db.session.query(func.count(Query.id)).scalar() or 0
     return render_template("dashboard.html", clients=clients, total_reports=total_reports, total_competitors=total_competitors, total_queries=total_queries)
 
 
