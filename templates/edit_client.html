@@ -46,27 +46,15 @@
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-3">Subscription Tier</label>
                 <div class="grid grid-cols-3 gap-3">
+                    {% for tier in tiers %}
                     <label class="relative cursor-pointer">
-                        <input type="radio" name="subscription_tier" value="trial" {% if client.subscription_tier == 'trial' %}checked{% endif %} class="sr-only peer">
+                        <input type="radio" name="subscription_tier" value="{{ tier.slug }}" {% if client.subscription_tier == tier.slug %}checked{% endif %} class="sr-only peer">
                         <div class="p-4 rounded-xl border-2 border-gray-200 peer-checked:border-brand peer-checked:bg-brand-50 transition text-center hover:border-gray-300">
-                            <p class="text-sm font-semibold text-gray-700">Trial</p>
-                            <p class="text-xs text-gray-400 mt-0.5">1 report</p>
+                            <p class="text-sm font-semibold text-gray-700">{{ tier.name }}</p>
+                            <p class="text-xs text-gray-400 mt-0.5">${{ tier.price|int if tier.price == tier.price|int else tier.price }}</p>
                         </div>
                     </label>
-                    <label class="relative cursor-pointer">
-                        <input type="radio" name="subscription_tier" value="6month" {% if client.subscription_tier == '6month' %}checked{% endif %} class="sr-only peer">
-                        <div class="p-4 rounded-xl border-2 border-gray-200 peer-checked:border-brand peer-checked:bg-brand-50 transition text-center hover:border-gray-300">
-                            <p class="text-sm font-semibold text-gray-700">6-Month</p>
-                            <p class="text-xs text-gray-400 mt-0.5">Subscription</p>
-                        </div>
-                    </label>
-                    <label class="relative cursor-pointer">
-                        <input type="radio" name="subscription_tier" value="1year" {% if client.subscription_tier == '1year' %}checked{% endif %} class="sr-only peer">
-                        <div class="p-4 rounded-xl border-2 border-gray-200 peer-checked:border-brand peer-checked:bg-brand-50 transition text-center hover:border-gray-300">
-                            <p class="text-sm font-semibold text-gray-700">1-Year</p>
-                            <p class="text-xs text-gray-400 mt-0.5">Subscription</p>
-                        </div>
-                    </label>
+                    {% endfor %}
                 </div>
             </div>
 

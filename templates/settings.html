@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-6 py-8">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between mb-6 animate-in">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-1">Settings</h1>
+            <p class="text-sm text-gray-500">Manage subscription tiers and pricing</p>
+        </div>
+        <button onclick="showAddModal()" class="flex items-center gap-2 stat-gradient-1 hover:opacity-90 text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg">
+            <span class="material-symbols-outlined text-[18px]">add</span>
+            Add New Tier
+        </button>
+    </div>
+
+    <!-- Tiers Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for tier in tiers %}
+        <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-6 card-hover animate-in" style="animation-delay: {{ loop.index0 * 0.05 }}s">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800">{{ tier.name }}</h3>
+                    <p class="text-xs text-gray-400 font-mono">{{ tier.slug }}</p>
+                </div>
+                <span class="px-2.5 py-1 rounded-lg text-xs font-semibold {% if tier.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+                    {% if tier.is_active %}Active{% else %}Inactive{% endif %}
+                </span>
+            </div>
+
+            <div class="mb-4">
+                <div class="text-3xl font-bold text-brand mb-1">${{ tier.price|int if tier.price == tier.price|int else tier.price }}</div>
+                <p class="text-sm text-gray-500">
+                    {% if tier.duration_months == 0 %}
+                    Trial
+                    {% elif tier.duration_months == 1 %}
+                    1 month
+                    {% else %}
+                    {{ tier.duration_months }} months
+                    {% endif %}
+                </p>
+            </div>
+
+            {% if tier.get_features()|length > 0 %}
+            <div class="mb-4 pt-4 border-t border-gray-100">
+                <p class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Features</p>
+                <ul class="space-y-1.5">
+                    {% for feature in tier.get_features() %}
+                    <li class="flex items-start gap-2 text-sm text-gray-600">
+                        <span class="material-symbols-outlined text-[16px] text-brand mt-0.5">check_circle</span>
+                        <span>{{ feature }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div class="flex gap-2 pt-4 border-t border-gray-100">
+                <button onclick="showEditModal({{ tier.id }}, '{{ tier.name }}', '{{ tier.slug }}', {{ tier.price }}, {{ tier.duration_months }}, {{ tier.get_features()|tojson }})" class="flex-1 flex items-center justify-center gap-1 text-sm font-medium text-brand hover:bg-brand-50 px-3 py-2 rounded-lg transition">
+                    <span class="material-symbols-outlined text-[16px]">edit</span>
+                    Edit
+                </button>
+                <form action="/settings/tiers/{{ tier.id }}/toggle" method="POST" class="flex-1">
+                    <button type="submit" class="w-full flex items-center justify-center gap-1 text-sm font-medium text-gray-600 hover:bg-gray-100 px-3 py-2 rounded-lg transition">
+                        <span class="material-symbols-outlined text-[16px]">{% if tier.is_active %}visibility_off{% else %}visibility{% endif %}</span>
+                        {% if tier.is_active %}Hide{% else %}Show{% endif %}
+                    </button>
+                </form>
+                <form action="/settings/tiers/{{ tier.id }}/delete" method="POST" onsubmit="return confirm('Delete tier \'{{ tier.name }}\'?');">
+                    <button type="submit" class="flex items-center justify-center gap-1 text-sm font-medium text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg transition">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if tiers|length == 0 %}
+    <div class="text-center py-16">
+        <span class="material-symbols-outlined text-[64px] text-gray-300 mb-3">inventory_2</span>
+        <p class="text-gray-400 mb-4">No subscription tiers created yet</p>
+        <button onclick="showAddModal()" class="inline-flex items-center gap-2 stat-gradient-1 hover:opacity-90 text-white font-semibold px-6 py-3 rounded-xl transition">
+            <span class="material-symbols-outlined text-[18px]">add</span>
+            Add Your First Tier
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Tier Modal -->
+<div id="addModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="if(event.target === this) hideAddModal()">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold text-gray-800">Add New Tier</h2>
+            <button onclick="hideAddModal()" class="text-gray-400 hover:text-gray-600">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <form action="/settings/tiers/new" method="POST">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Tier Name <span class="text-red-400">*</span></label>
+                    <input type="text" name="name" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none" placeholder="e.g., Premium">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Slug <span class="text-red-400">*</span></label>
+                    <input type="text" name="slug" required pattern="[a-z0-9_-]+" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none font-mono" placeholder="e.g., premium">
+                    <p class="text-xs text-gray-400 mt-1">Lowercase letters, numbers, hyphens and underscores only</p>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Price ($)</label>
+                        <input type="number" name="price" step="0.01" min="0" value="0" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Duration (months)</label>
+                        <input type="number" name="duration_months" min="0" value="0" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Features</label>
+                    <textarea name="features" rows="4" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none resize-none" placeholder="One feature per line"></textarea>
+                    <p class="text-xs text-gray-400 mt-1">Enter one feature per line</p>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button type="submit" class="flex-1 stat-gradient-1 hover:opacity-90 text-white font-semibold px-6 py-3 rounded-xl transition">
+                    Create Tier
+                </button>
+                <button type="button" onclick="hideAddModal()" class="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-xl transition">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Tier Modal -->
+<div id="editModal" class="hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="if(event.target === this) hideEditModal()">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold text-gray-800">Edit Tier</h2>
+            <button onclick="hideEditModal()" class="text-gray-400 hover:text-gray-600">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <form id="editForm" method="POST">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Tier Name <span class="text-red-400">*</span></label>
+                    <input type="text" id="editName" name="name" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Slug <span class="text-red-400">*</span></label>
+                    <input type="text" id="editSlug" name="slug" required pattern="[a-z0-9_-]+" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none font-mono">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Price ($)</label>
+                        <input type="number" id="editPrice" name="price" step="0.01" min="0" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Duration (months)</label>
+                        <input type="number" id="editDuration" name="duration_months" min="0" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Features</label>
+                    <textarea id="editFeatures" name="features" rows="4" class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none resize-none"></textarea>
+                    <p class="text-xs text-gray-400 mt-1">Enter one feature per line</p>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button type="submit" class="flex-1 stat-gradient-1 hover:opacity-90 text-white font-semibold px-6 py-3 rounded-xl transition">
+                    Save Changes
+                </button>
+                <button type="button" onclick="hideEditModal()" class="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-xl transition">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showAddModal() {
+    document.getElementById('addModal').classList.remove('hidden');
+}
+
+function hideAddModal() {
+    document.getElementById('addModal').classList.add('hidden');
+}
+
+function showEditModal(id, name, slug, price, duration, features) {
+    document.getElementById('editForm').action = '/settings/tiers/' + id + '/edit';
+    document.getElementById('editName').value = name;
+    document.getElementById('editSlug').value = slug;
+    document.getElementById('editPrice').value = price;
+    document.getElementById('editDuration').value = duration;
+    document.getElementById('editFeatures').value = features.join('\n');
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function hideEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+</script>
+{% endblock %}

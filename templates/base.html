@@ -47,9 +47,10 @@
     <nav class="gradient-header text-white shadow-xl sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur">
-                    <span class="text-xl font-black">B</span>
-                </div>
+                <a href="/" class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur overflow-hidden">
+                    <img src="/static/images/logo.png" alt="Balthazaar Logo" class="w-full h-full object-contain p-1" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <span class="text-xl font-black hidden">B</span>
+                </a>
                 <div>
                     <a href="/" class="text-xl font-bold tracking-tight">Balthazaar</a>
                     <p class="text-[10px] text-white/60 tracking-widest uppercase">Competitive Intelligence</p>
@@ -59,6 +60,14 @@
                 <a href="/" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition {% block nav_dashboard %}{% endblock %}">
                     <span class="material-symbols-outlined text-[18px]">dashboard</span>
                     Dashboard
+                </a>
+                <a href="/links" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition">
+                    <span class="material-symbols-outlined text-[18px]">link</span>
+                    Links
+                </a>
+                <a href="/settings" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition">
+                    <span class="material-symbols-outlined text-[18px]">settings</span>
+                    Settings
                 </a>
                 <a href="/clients/new" class="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-semibold transition backdrop-blur">
                     <span class="material-symbols-outlined text-[18px]">add</span>

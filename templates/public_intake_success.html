@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Form Submitted{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-6 py-16">
+    <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-12 text-center animate-in">
+        <div class="w-20 h-20 stat-gradient-1 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span class="material-symbols-outlined text-[48px] text-white">check_circle</span>
+        </div>
+
+        <h1 class="text-3xl font-bold text-gray-800 mb-3">
+            Thank You, {{ client_name }}!
+        </h1>
+
+        <p class="text-gray-600 mb-8">
+            Your information has been successfully submitted. Our team will review your details and get back to you shortly with your competitive intelligence report.
+        </p>
+
+        <div class="inline-flex flex-col gap-3 bg-brand-50 border border-brand-200 rounded-xl p-6 mb-8">
+            <div class="flex items-center gap-2 text-brand">
+                <span class="material-symbols-outlined text-[20px]">schedule</span>
+                <p class="text-sm font-medium">Expected response time: 1-2 business days</p>
+            </div>
+            <div class="flex items-center gap-2 text-brand">
+                <span class="material-symbols-outlined text-[20px]">mail</span>
+                <p class="text-sm font-medium">Check your email for updates</p>
+            </div>
+        </div>
+
+        <p class="text-sm text-gray-400">
+            If you have any questions, feel free to reach out to our support team.
+        </p>
+    </div>
+</div>
+{% endblock %}

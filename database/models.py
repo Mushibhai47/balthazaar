@@ -84,3 +84,35 @@ class Report(db.Model):
     data = db.Column(db.Text, default="{}")  # JSON blob with all scraped results
     generated_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class SubscriptionTier(db.Model):
+    __tablename__ = "subscription_tiers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    slug = db.Column(db.String(50), nullable=False, unique=True)  # trial, 6month, 1year
+    price = db.Column(db.Float, default=0.0)
+    duration_months = db.Column(db.Integer, default=0)  # 0 for trial, 6, 12, etc
+    features = db.Column(db.Text, default="[]")  # JSON list of features
+    is_active = db.Column(db.Boolean, default=True)
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def get_features(self):
+        return json.loads(self.features) if self.features else []
+
+    def set_features(self, features_list):
+        self.features = json.dumps(features_list)
+
+
+class ShareableLink(db.Model):
+    __tablename__ = "shareable_links"
+
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(64), unique=True, nullable=False)
+    label = db.Column(db.String(255), default="Intake Form")
+    is_active = db.Column(db.Boolean, default=True)
+    use_count = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)
