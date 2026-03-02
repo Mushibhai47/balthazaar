@@ -1,6 +1,8 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import json
+import os
+from cryptography.fernet import Fernet
 
 db = SQLAlchemy()
 
@@ -116,3 +118,37 @@ class ShareableLink(db.Model):
     use_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime, nullable=True)
+
+
+class APICredential(db.Model):
+    __tablename__ = "api_credentials"
+
+    id = db.Column(db.Integer, primary_key=True)
+    service_name = db.Column(db.String(50), unique=True, nullable=False)  # openai, google_gemini, youtube, etc
+    encrypted_credentials = db.Column(db.Text, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def _get_encryption_key(self):
+        """Get encryption key from environment or config"""
+        key = os.environ.get("ENCRYPTION_KEY", "placeholder-generate-real-key-before-production")
+        # If it's the placeholder, generate a proper key for development
+        if key == "placeholder-generate-real-key-before-production":
+            key = Fernet.generate_key().decode()
+        # Ensure key is bytes
+        if isinstance(key, str):
+            key = key.encode()
+        return key
+
+    def set_credentials(self, creds_dict):
+        """Encrypt and store API credentials as JSON"""
+        fernet = Fernet(self._get_encryption_key())
+        json_creds = json.dumps(creds_dict)
+        self.encrypted_credentials = fernet.encrypt(json_creds.encode()).decode()
+
+    def get_credentials(self):
+        """Decrypt and return API credentials as dict"""
+        fernet = Fernet(self._get_encryption_key())
+        decrypted = fernet.decrypt(self.encrypted_credentials.encode())
+        return json.loads(decrypted.decode())

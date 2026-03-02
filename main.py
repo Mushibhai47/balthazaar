@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from sqlalchemy import func
-from database.models import db, Client, Competitor, Query, Report, SubscriptionTier, ShareableLink
+from database.models import db, Client, Competitor, Query, Report, SubscriptionTier, ShareableLink, APICredential
 from config import Config
 from countries import COUNTRIES
 from datetime import datetime
@@ -196,15 +196,52 @@ def delete_client(client_id):
     return redirect(url_for("dashboard"))
 
 
-# --- Run Report (placeholder for future milestones) ---
+# --- Run Report ---
 @app.route("/queries/<int:query_id>/run", methods=["POST"])
 def run_report(query_id):
+    from tasks import generate_keyword_report  # Import here to avoid circular imports
+
     query = Query.query.get_or_404(query_id)
+
+    # Create new report
     report = Report(query_id=query.id, status="pending")
     db.session.add(report)
     db.session.commit()
-    flash("Report queued. Data collection will begin when sources are connected (Milestone 2+).", "success")
+
+    # Queue Celery task for background processing
+    try:
+        generate_keyword_report.delay(report.id)
+        flash("Report generation started! Data is being collected from all sources.", "success")
+    except Exception as e:
+        flash(f"Error starting report generation: {str(e)}. Make sure Redis and Celery are running.", "error")
+        report.status = "failed"
+        db.session.commit()
+
     return redirect(url_for("view_client", client_id=query.client_id))
+
+
+# --- Report Status API (for real-time progress updates) ---
+@app.route("/api/reports/<int:report_id>/status")
+def report_status(report_id):
+    """API endpoint to check report generation status"""
+    report = Report.query.get_or_404(report_id)
+
+    # Parse report data to get progress info
+    try:
+        data = json.loads(report.data) if report.data else {}
+        metadata = data.get("metadata", {})
+    except json.JSONDecodeError:
+        metadata = {}
+
+    return jsonify({
+        "id": report.id,
+        "status": report.status,
+        "progress": metadata.get("progress", 0),
+        "sources_succeeded": len(metadata.get("sources_succeeded", [])),
+        "sources_failed": len(metadata.get("sources_failed", [])),
+        "errors": metadata.get("errors", {}),
+        "generated_at": report.generated_at.isoformat() if report.generated_at else None
+    })
 
 
 # --- Toggle Auto-Run ---
