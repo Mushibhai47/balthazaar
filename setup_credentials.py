@@ -60,6 +60,24 @@ def setup_youtube(api_key):
         print("[OK] YouTube credentials saved successfully!")
 
 
+def setup_ubersuggest(email, password):
+    """Set up Ubersuggest credentials (email + password)"""
+    with app.app_context():
+        cred = APICredential.query.filter_by(service_name="ubersuggest").first()
+
+        if cred:
+            print("Updating existing Ubersuggest credentials...")
+            cred.set_credentials({"email": email, "password": password})
+        else:
+            print("Creating new Ubersuggest credentials...")
+            cred = APICredential(service_name="ubersuggest")
+            cred.set_credentials({"email": email, "password": password})
+            db.session.add(cred)
+
+        db.session.commit()
+        print("[OK] Ubersuggest credentials saved successfully!")
+
+
 def list_credentials():
     """List all configured API credentials"""
     with app.app_context():
@@ -84,10 +102,11 @@ Usage:
   python setup_credentials.py <command> [args]
 
 Commands:
-  openai <api_key>        - Set up OpenAI API credentials
-  gemini <api_key>        - Set up Google Gemini API credentials
-  youtube <api_key>       - Set up YouTube API credentials
-  list                    - List all configured credentials
+  openai <api_key>                 - Set up OpenAI API credentials
+  gemini <api_key>                 - Set up Google Gemini API credentials
+  youtube <api_key>                - Set up YouTube API credentials
+  ubersuggest <email> <password>   - Set up Ubersuggest login credentials
+  list                             - List all configured credentials
 
 Examples:
   python setup_credentials.py openai sk-proj-abc123...
@@ -104,6 +123,8 @@ Examples:
         setup_google_gemini(sys.argv[2])
     elif command == "youtube" and len(sys.argv) == 3:
         setup_youtube(sys.argv[2])
+    elif command == "ubersuggest" and len(sys.argv) == 4:
+        setup_ubersuggest(sys.argv[2], sys.argv[3])
     elif command == "list":
         list_credentials()
     else:
