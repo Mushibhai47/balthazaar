@@ -2,7 +2,12 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import json
 import os
-from cryptography.fernet import Fernet
+import base64
+try:
+    from cryptography.fernet import Fernet
+    HAS_CRYPTOGRAPHY = True
+except ImportError:
+    HAS_CRYPTOGRAPHY = False
 
 db = SQLAlchemy()
 
@@ -149,6 +154,18 @@ class APICredential(db.Model):
 
     def get_credentials(self):
         """Decrypt and return API credentials as dict"""
-        fernet = Fernet(self._get_encryption_key())
-        decrypted = fernet.decrypt(self.encrypted_credentials.encode())
-        return json.loads(decrypted.decode())
+        # Try Fernet decryption first (if cryptography is available)
+        if HAS_CRYPTOGRAPHY:
+            try:
+                fernet = Fernet(self._get_encryption_key())
+                decrypted = fernet.decrypt(self.encrypted_credentials.encode())
+                return json.loads(decrypted.decode())
+            except Exception:
+                pass  # Fall through to base64 decoding
+
+        # Fallback to base64 decoding (used by simple_setup.py)
+        try:
+            decoded = base64.b64decode(self.encrypted_credentials.encode()).decode()
+            return json.loads(decoded)
+        except Exception as e:
+            raise ValueError(f"Could not decrypt credentials for {self.service_name}: {e}")
