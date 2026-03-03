@@ -22,7 +22,7 @@ class GeminiCollector(BaseKeywordCollector):
             raise ValueError("Google Gemini API key not found in credentials")
 
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
         """
