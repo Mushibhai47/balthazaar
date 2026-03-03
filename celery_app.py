@@ -22,3 +22,6 @@ celery.conf.update(
     task_time_limit=600,  # 10 minutes max per task
     task_soft_time_limit=540,  # 9 minute soft limit
 )
+
+# Import tasks to register them with Celery
+import tasks  # noqa: F401
