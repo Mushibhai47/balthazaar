@@ -1,8 +1,8 @@
-run = "python main.py"
+run = "bash start.sh"
 language = "python3"
 
 [nix]
 channel = "stable-24_05"
 
 [deployment]
-run = ["sh", "-c", "gunicorn --bind 0.0.0.0:5000 main:app"]
+run = ["sh", "-c", "bash start.sh"]
