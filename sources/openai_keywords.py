@@ -19,7 +19,12 @@ class OpenAICollector(BaseKeywordCollector):
         if not self.api_key:
             raise ValueError("OpenAI API key not found in credentials")
 
-        self.client = OpenAI(api_key=self.api_key)
+        # Initialize OpenAI client with explicit parameters to avoid proxy issues
+        self.client = OpenAI(
+            api_key=self.api_key,
+            timeout=30.0,
+            max_retries=2
+        )
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
         """
