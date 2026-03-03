@@ -3,6 +3,13 @@ Celery application instance for background task processing
 """
 from celery import Celery
 from config import Config
+from flask import Flask
+from database.models import db
+
+# Initialize Flask app for Celery tasks
+app = Flask(__name__)
+app.config.from_object(Config)
+db.init_app(app)
 
 # Initialize Celery
 celery = Celery(

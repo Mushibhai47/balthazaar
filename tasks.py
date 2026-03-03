@@ -1,7 +1,7 @@
 """
 Celery tasks for background keyword data collection
 """
-from celery_app import celery
+from celery_app import celery, app
 from database.models import db, Report, Query, APICredential
 from datetime import datetime
 import json
@@ -18,8 +18,6 @@ def generate_keyword_report(self, report_id: int):
     Args:
         report_id: ID of the Report to populate with data
     """
-    from main import app  # Import here to avoid circular imports
-
     with app.app_context():
         try:
             # Get the report
