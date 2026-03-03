@@ -3,19 +3,15 @@ Celery application instance for background task processing
 """
 from celery import Celery
 from config import Config
-from app_factory import create_app
 
-# Initialize Flask app for Celery tasks
-app = create_app()
-
-# Initialize Celery
+# Initialize Celery WITHOUT Flask app to avoid integration issues
 celery = Celery(
     "balthazaar",
     broker=Config.CELERY_BROKER_URL,
     backend=Config.CELERY_RESULT_BACKEND
 )
 
-# Configure Celery with Flask config
+# Configure Celery
 celery.conf.update(
     task_serializer=Config.CELERY_TASK_SERIALIZER,
     result_serializer=Config.CELERY_RESULT_SERIALIZER,
