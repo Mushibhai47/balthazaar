@@ -1,13 +1,13 @@
 """
 Google Gemini keyword data collector
-Uses Gemini Pro to analyze keywords and provide insights
+Uses Gemini to analyze keywords and provide insights
 """
 from sources.base import BaseKeywordCollector
 from typing import Dict, List, Any
 import logging
-import google.generativeai as genai
 import json
 import re
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +21,19 @@ class GeminiCollector(BaseKeywordCollector):
         if not self.api_key:
             raise ValueError("Google Gemini API key not found in credentials")
 
-        genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        # Try newer google.genai package first, fall back to google.generativeai
+        try:
+            import google.genai as genai
+            self.client = genai.Client(api_key=self.api_key)
+            self.model_name = "gemini-2.0-flash"
+            self.use_new_api = True
+            logger.info("Using new google.genai package")
+        except (ImportError, Exception):
+            import google.generativeai as genai_old
+            genai_old.configure(api_key=self.api_key)
+            self.model = genai_old.GenerativeModel('gemini-1.5-flash-latest')
+            self.use_new_api = False
+            logger.info("Using legacy google.generativeai package")
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
         """
@@ -46,11 +57,19 @@ class GeminiCollector(BaseKeywordCollector):
             # Create prompt for Gemini
             prompt = self._create_prompt(batch, countries)
 
-            # Call Gemini API
-            response = self.model.generate_content(prompt)
+            # Call Gemini API (handle both old and new API)
+            if self.use_new_api:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt
+                )
+                response_text = response.text
+            else:
+                response = self.model.generate_content(prompt)
+                response_text = response.text
 
             # Parse response
-            batch_results = self._parse_response(response.text, batch)
+            batch_results = self._parse_response(response_text, batch)
             results.update(batch_results)
 
         return results
@@ -143,8 +162,12 @@ Provide ONLY the JSON object, no additional text or markdown formatting."""
     def validate_credentials(self) -> bool:
         """Validate Gemini API key"""
         try:
-            # Try a minimal generation to validate key
-            response = self.model.generate_content("Hello")
+            if self.use_new_api:
+                response = self.client.models.generate_content(
+                    model=self.model_name, contents="Hello"
+                )
+            else:
+                response = self.model.generate_content("Hello")
             return bool(response.text)
         except Exception as e:
             logger.error(f"Gemini credential validation failed: {e}")
