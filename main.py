@@ -196,6 +196,20 @@ def delete_client(client_id):
     return redirect(url_for("dashboard"))
 
 
+# --- View Report ---
+@app.route("/reports/<int:report_id>")
+def view_report(report_id):
+    report = Report.query.get_or_404(report_id)
+    query = report.query
+    client = query.client
+    keywords = query.get_keywords()
+    try:
+        data = json.loads(report.data) if report.data else {}
+    except json.JSONDecodeError:
+        data = {}
+    return render_template("report_detail.html", report=report, query=query, client=client, data=data, keywords=keywords)
+
+
 # --- Run Report ---
 @app.route("/queries/<int:query_id>/run", methods=["POST"])
 def run_report(query_id):

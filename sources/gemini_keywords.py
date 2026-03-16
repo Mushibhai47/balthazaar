@@ -25,7 +25,7 @@ class GeminiCollector(BaseKeywordCollector):
         try:
             import google.genai as genai
             self.client = genai.Client(api_key=self.api_key)
-            self.model_name = "gemini-2.0-flash"
+            self.model_name = "gemini-2.0-flash-exp"
             self.use_new_api = True
             logger.info("Using new google.genai package")
         except (ImportError, Exception):
