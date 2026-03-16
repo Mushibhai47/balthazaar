@@ -24,3 +24,12 @@ flask-limiter==3.5.0
 selenium==4.18.0
 beautifulsoup4==4.12.3
 requests==2.31.0
+
+# NLP & sentiment analysis
+vaderSentiment==3.3.2
+
+# RSS / news monitoring
+feedparser==6.0.11
+
+# Wayback Machine / web utils
+lxml==5.1.0

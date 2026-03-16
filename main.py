@@ -207,7 +207,19 @@ def view_report(report_id):
         data = json.loads(report.data) if report.data else {}
     except json.JSONDecodeError:
         data = {}
-    return render_template("report_detail.html", report=report, query=query, client=client, data=data, keywords=keywords)
+    kw_data = data.get('keywords', {})
+    ai_data = kw_data.get('openai', kw_data.get('google_gemini', {}))
+    rising_count = sum(1 for kw in keywords if ai_data.get(kw, {}).get('trend') == 'rising')
+    cpc_vals = [ai_data.get(kw, {}).get('estimated_cpc', 0) for kw in keywords if ai_data.get(kw, {}).get('estimated_cpc', 0) > 0]
+    avg_cpc = round(sum(cpc_vals) / len(cpc_vals), 2) if cpc_vals else 0.0
+    metadata = data.get('metadata', {})
+
+    return render_template("report_detail.html",
+        report=report, query=query, client=client,
+        data=data, keywords=keywords,
+        rising_count=rising_count, avg_cpc=avg_cpc,
+        metadata=metadata
+    )
 
 
 # --- Run Report ---

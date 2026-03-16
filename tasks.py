@@ -10,48 +10,71 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# All collectors: credentials_required=False means they run without DB credentials
+COLLECTORS_CONFIG = [
+    {"name": "openai",          "module": "sources.openai_keywords",    "class": "OpenAICollector",         "credentials_required": True},
+    {"name": "google_gemini",   "module": "sources.gemini_keywords",    "class": "GeminiCollector",         "credentials_required": True},
+    {"name": "youtube",         "module": "sources.youtube_keywords",   "class": "YouTubeCollector",        "credentials_required": True},
+    {"name": "tiktok",          "module": "sources.tiktok_keywords",    "class": "TikTokCollector",         "credentials_required": True},
+    {"name": "instagram",       "module": "sources.instagram_keywords", "class": "InstagramCollector",      "credentials_required": True},
+    {"name": "ubersuggest",     "module": "sources.ubersuggest",        "class": "UbersuggestCollector",    "credentials_required": True},
+    {"name": "google_ads",      "module": "sources.google_ads_keywords","class": "GoogleAdsCollector",      "credentials_required": True},
+    # Meta ads uses instagram credentials (access_token)
+    {"name": "ads_tracker",     "module": "sources.ads_tracker",        "class": "AdsTrackerCollector",     "credentials_required": True,  "use_credentials_from": "instagram"},
+    # Sentiment uses youtube credentials but can work without
+    {"name": "sentiment",       "module": "sources.sentiment_analyzer", "class": "SentimentCollector",      "credentials_required": False, "use_credentials_from": "youtube"},
+    # Free sources - no credentials needed
+    {"name": "google_news",     "module": "sources.google_news",        "class": "GoogleNewsCollector",     "credentials_required": False},
+    {"name": "wayback_machine", "module": "sources.wayback_machine",    "class": "WaybackMachineCollector", "credentials_required": False},
+    {"name": "linkedin_jobs",   "module": "sources.linkedin_jobs",      "class": "LinkedInJobsCollector",   "credentials_required": False},
+]
+
 
 @celery.task(bind=True, name="tasks.generate_keyword_report")
 def generate_keyword_report(self, report_id: int):
-    """
-    Background task to collect keyword data from all sources
-
-    Args:
-        report_id: ID of the Report to populate with data
-    """
+    """Background task to collect data from all sources and build the report"""
     app = create_app()
     with app.app_context():
         try:
-            # Get the report
             report = Report.query.get(report_id)
             if not report:
-                logger.error(f"Report {report_id} not found")
                 return {"error": "Report not found"}
 
-            # Update status to running
             report.status = "running"
             db.session.commit()
 
-            # Get the associated query
             query = Query.query.get(report.query_id)
             if not query:
-                logger.error(f"Query {query.id} not found")
                 report.status = "failed"
                 db.session.commit()
                 return {"error": "Query not found"}
 
             keywords = query.get_keywords()
             countries = query.get_countries()
+            client = query.client
 
             logger.info(f"Generating report for {len(keywords)} keywords across {len(countries)} countries")
 
-            # Initialize report data structure
+            # Build competitor context to pass to all collectors
+            context = {
+                '_client_name': client.name,
+                '_client_website': client.website,
+                '_competitors': [
+                    {
+                        'name': c.name,
+                        'website': c.website,
+                        'youtube_url': c.youtube_url or ''
+                    }
+                    for c in client.competitors
+                ]
+            }
+
             report_data = {
                 "version": "2.0",
                 "keywords": {},
-                "aggregated_insights": {},
                 "metadata": {
                     "collected_at": datetime.utcnow().isoformat(),
+                    "client_name": client.name,
                     "sources_succeeded": [],
                     "sources_failed": [],
                     "errors": {},
@@ -59,74 +82,61 @@ def generate_keyword_report(self, report_id: int):
                 }
             }
 
-            # List of collectors to use (will be imported dynamically as we build them)
-            collectors_config = [
-                {"name": "openai", "module": "sources.openai_keywords", "class": "OpenAICollector"},
-                {"name": "google_gemini", "module": "sources.gemini_keywords", "class": "GeminiCollector"},
-                {"name": "youtube", "module": "sources.youtube_keywords", "class": "YouTubeCollector"},
-                {"name": "tiktok", "module": "sources.tiktok_keywords", "class": "TikTokCollector"},
-                {"name": "instagram", "module": "sources.instagram_keywords", "class": "InstagramCollector"},
-                {"name": "ubersuggest", "module": "sources.ubersuggest", "class": "UbersuggestCollector"},
-                # Note: Google Ads collector requires complex OAuth setup, implement later
-            ]
+            total = len(COLLECTORS_CONFIG)
+            completed = 0
 
-            total_collectors = len(collectors_config)
-            completed_collectors = 0
-
-            # Collect data from each source
-            for collector_config in collectors_config:
+            for cfg in COLLECTORS_CONFIG:
+                source_name = cfg["name"]
                 try:
-                    source_name = collector_config["name"]
                     logger.info(f"Collecting data from {source_name}...")
 
-                    # Get API credentials for this source
-                    cred = APICredential.query.filter_by(service_name=source_name, is_active=True).first()
-                    if not cred:
-                        logger.warning(f"No credentials found for {source_name}, skipping")
+                    # Determine which credentials to load
+                    cred_service = cfg.get("use_credentials_from", source_name)
+                    cred = APICredential.query.filter_by(service_name=cred_service, is_active=True).first()
+
+                    if cfg["credentials_required"] and not cred:
+                        logger.warning(f"No credentials for {source_name}, skipping")
                         report_data["metadata"]["sources_failed"].append(source_name)
                         report_data["metadata"]["errors"][source_name] = "No credentials configured"
                         continue
 
-                    # Dynamically import the collector
-                    module = __import__(collector_config["module"], fromlist=[collector_config["class"]])
-                    CollectorClass = getattr(module, collector_config["class"])
+                    # Build credentials dict with context
+                    cred_dict = cred.get_credentials() if cred else {}
+                    cred_dict.update(context)  # Inject competitor/client context
 
-                    # Instantiate and run collector
-                    collector = CollectorClass(cred.get_credentials())
+                    # Dynamically import and run collector
+                    mod = __import__(cfg["module"], fromlist=[cfg["class"]])
+                    CollectorClass = getattr(mod, cfg["class"])
+                    collector = CollectorClass(cred_dict)
                     result = collector.safe_collect(keywords, countries)
 
                     if result["success"]:
                         report_data["keywords"][source_name] = result["data"]
                         report_data["metadata"]["sources_succeeded"].append(source_name)
-                        logger.info(f"Successfully collected data from {source_name}")
+                        logger.info(f"Successfully collected from {source_name}")
                     else:
                         report_data["metadata"]["sources_failed"].append(source_name)
                         report_data["metadata"]["errors"][source_name] = result.get("error", "Unknown error")
                         logger.error(f"Failed to collect from {source_name}: {result.get('error')}")
 
                 except Exception as e:
-                    logger.error(f"Error with collector {source_name}: {str(e)}")
+                    logger.error(f"Error with {source_name}: {str(e)}")
                     report_data["metadata"]["sources_failed"].append(source_name)
                     report_data["metadata"]["errors"][source_name] = str(e)
 
                 finally:
-                    # Update progress
-                    completed_collectors += 1
-                    progress = int((completed_collectors / total_collectors) * 100)
-                    report_data["metadata"]["progress"] = progress
-
-                    # Save intermediate results
+                    completed += 1
+                    report_data["metadata"]["progress"] = int(completed / total * 100)
                     report.data = json.dumps(report_data)
                     db.session.commit()
 
-            # Mark as complete if at least one source succeeded
-            if len(report_data["metadata"]["sources_succeeded"]) > 0:
+            if report_data["metadata"]["sources_succeeded"]:
                 report.status = "complete"
                 report.generated_at = datetime.utcnow()
-                logger.info(f"Report {report_id} completed successfully with {len(report_data['metadata']['sources_succeeded'])} sources")
+                logger.info(f"Report {report_id} complete — {len(report_data['metadata']['sources_succeeded'])} sources succeeded")
             else:
                 report.status = "failed"
-                logger.error(f"Report {report_id} failed - no sources succeeded")
+                logger.error(f"Report {report_id} failed — no sources succeeded")
 
             report.data = json.dumps(report_data)
             db.session.commit()
@@ -139,7 +149,7 @@ def generate_keyword_report(self, report_id: int):
             }
 
         except Exception as e:
-            logger.error(f"Fatal error generating report {report_id}: {str(e)}")
+            logger.error(f"Fatal error on report {report_id}: {str(e)}")
             report = Report.query.get(report_id)
             if report:
                 report.status = "failed"

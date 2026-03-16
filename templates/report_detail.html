@@ -4,13 +4,12 @@
 {% block content %}
 <div class="max-w-6xl mx-auto animate-in">
 
-    <!-- Breadcrumb -->
     <a href="/clients/{{ client.id }}" class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-brand transition mb-6">
         <span class="material-symbols-outlined text-[16px]">arrow_back</span>
         Back to {{ client.name }}
     </a>
 
-    <!-- Header Card -->
+    <!-- Header -->
     <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
         <div class="flex items-start justify-between flex-wrap gap-4">
             <div>
@@ -21,154 +20,154 @@
                         {% elif report.status == 'running' %}bg-amber-50 text-amber-700 border border-amber-200
                         {% elif report.status == 'failed' %}bg-red-50 text-red-700 border border-red-200
                         {% else %}bg-gray-100 text-gray-500 border border-gray-200{% endif %}">
-                        <span class="w-2 h-2 rounded-full
-                            {% if report.status == 'complete' %}bg-emerald-400
-                            {% elif report.status == 'running' %}bg-amber-400 animate-pulse
-                            {% elif report.status == 'failed' %}bg-red-400
-                            {% else %}bg-gray-400{% endif %}"></span>
+                        <span class="w-2 h-2 rounded-full {% if report.status == 'complete' %}bg-emerald-400{% elif report.status == 'running' %}bg-amber-400{% elif report.status == 'failed' %}bg-red-400{% else %}bg-gray-400{% endif %}"></span>
                         {{ report.status | capitalize }}
                     </span>
                 </div>
                 <p class="text-sm text-gray-500">
                     <span class="font-medium text-gray-700">{{ client.name }}</span> ·
-                    {% if report.generated_at %}{{ report.generated_at.strftime('%b %d, %Y at %H:%M UTC') }}
-                    {% else %}{{ report.created_at.strftime('%b %d, %Y') }}{% endif %}
-                    · <strong>{{ keywords|length }}</strong> keywords
-                    · {{ query.get_countries()|join(', ') }}
+                    {% if report.generated_at %}{{ report.generated_at.strftime('%b %d, %Y at %H:%M UTC') }}{% else %}{{ report.created_at.strftime('%b %d, %Y') }}{% endif %}
+                    · <strong>{{ keywords|length }}</strong> keywords · {{ query.get_countries()|join(', ') }}
                 </p>
             </div>
         </div>
 
-        <!-- Sources Status Row -->
-        {% set metadata = data.get('metadata', {}) %}
+        <!-- Sources status -->
         {% set succeeded = metadata.get('sources_succeeded', []) %}
         {% set failed = metadata.get('sources_failed', []) %}
         {% set errors = metadata.get('errors', {}) %}
-        {% set source_labels = {'openai': 'OpenAI', 'google_gemini': 'Gemini', 'youtube': 'YouTube', 'tiktok': 'TikTok', 'instagram': 'Instagram', 'ubersuggest': 'Ubersuggest'} %}
-        {% set all_sources = ['openai', 'google_gemini', 'youtube', 'tiktok', 'instagram', 'ubersuggest'] %}
+        {% set source_labels = {
+            'openai': 'OpenAI', 'google_gemini': 'Gemini', 'youtube': 'YouTube',
+            'tiktok': 'TikTok', 'instagram': 'Instagram', 'ubersuggest': 'Ubersuggest',
+            'google_ads': 'Google Ads', 'ads_tracker': 'Meta Ads',
+            'sentiment': 'Sentiment', 'google_news': 'Google News',
+            'wayback_machine': 'Web Amendments', 'linkedin_jobs': 'LinkedIn Jobs'
+        } %}
 
         <div class="mt-4 pt-4 border-t border-gray-100">
             <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2 block">Data Sources</span>
             <div class="flex flex-wrap gap-2">
-                {% for source in all_sources %}
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium
+                {% for source, label in source_labels.items() %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium
                     {% if source in succeeded %}bg-emerald-50 text-emerald-700 border border-emerald-200
                     {% elif source in failed %}bg-red-50 text-red-600 border border-red-200
                     {% else %}bg-gray-100 text-gray-400 border border-gray-200{% endif %}"
-                    {% if errors.get(source) %}title="{{ errors.get(source) }}"{% endif %}>
-                    {% if source in succeeded %}
-                    <span class="material-symbols-outlined text-[12px]">check_circle</span>
-                    {% elif source in failed %}
-                    <span class="material-symbols-outlined text-[12px]">cancel</span>
-                    {% else %}
-                    <span class="material-symbols-outlined text-[12px]">remove_circle</span>
-                    {% endif %}
-                    {{ source_labels.get(source, source) }}
+                    {% if errors.get(source) %}title="{{ errors.get(source)[:80] }}"{% endif %}>
+                    {% if source in succeeded %}<span class="material-symbols-outlined text-[12px]">check_circle</span>
+                    {% elif source in failed %}<span class="material-symbols-outlined text-[12px]">cancel</span>
+                    {% else %}<span class="material-symbols-outlined text-[12px]">radio_button_unchecked</span>{% endif %}
+                    {{ label }}
                 </span>
                 {% endfor %}
             </div>
         </div>
     </div>
 
-    {# ── COMPLETE: show data ── #}
-    {% if report.status == 'complete' and data.get('keywords') %}
+    {% if report.status in ['running', 'pending'] %}
+    <div class="glass-card rounded-2xl border border-gray-100 p-16 text-center mb-6">
+        <span class="material-symbols-outlined text-amber-400 text-[56px] block mb-4" style="animation:spin 2s linear infinite">sync</span>
+        <h3 class="text-xl font-semibold text-gray-700 mb-2">{% if report.status == 'running' %}Collecting data...{% else %}Queued...{% endif %}</h3>
+        <p class="text-sm text-gray-400">Page refreshes automatically every 5 seconds.</p>
+        {% if succeeded %}<p class="text-xs text-emerald-600 mt-3">✓ Done: {{ succeeded | join(', ') }}</p>{% endif %}
+    </div>
+    <script>setTimeout(() => location.reload(), 5000);</script>
+
+    {% elif report.status == 'failed' and not data.get('keywords') %}
+    <div class="glass-card rounded-2xl border border-gray-100 p-16 text-center">
+        <span class="material-symbols-outlined text-red-400 text-[56px] block mb-4">error_outline</span>
+        <h3 class="text-xl font-semibold text-gray-700 mb-2">Report failed</h3>
+        {% if errors %}<div class="text-left max-w-lg mx-auto mt-4 space-y-1">{% for s, e in errors.items() %}<p class="text-xs text-gray-500"><span class="font-medium">{{ s }}:</span> {{ e }}</p>{% endfor %}</div>{% endif %}
+    </div>
+
+    {% else %}
     {% set kw_data = data.get('keywords', {}) %}
     {% set ai_data = kw_data.get('openai', kw_data.get('google_gemini', {})) %}
     {% set yt_data = kw_data.get('youtube', {}) %}
+    {% set sentiment_data = kw_data.get('sentiment', {}) %}
+    {% set news_data = kw_data.get('google_news', {}) %}
+    {% set wayback_data = kw_data.get('wayback_machine', {}) %}
+    {% set jobs_data = kw_data.get('linkedin_jobs', {}) %}
+    {% set ads_data = kw_data.get('ads_tracker', {}) %}
 
     <!-- Summary Stats -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-5 text-center card-hover">
+        <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-brand text-[28px] mb-1">key</span>
             <p class="text-2xl font-bold text-gray-900">{{ keywords|length }}</p>
             <p class="text-xs text-gray-400">Keywords</p>
         </div>
-        <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-5 text-center card-hover">
+        <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-emerald-500 text-[28px] mb-1">database</span>
-            <p class="text-2xl font-bold text-gray-900">{{ succeeded|length }}<span class="text-sm text-gray-400 font-normal">/{{ all_sources|length }}</span></p>
+            <p class="text-2xl font-bold text-gray-900">{{ succeeded|length }}<span class="text-sm text-gray-400 font-normal">/12</span></p>
             <p class="text-xs text-gray-400">Sources</p>
         </div>
-        <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-5 text-center card-hover">
+        <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-accent text-[28px] mb-1">trending_up</span>
-            {% set ns = namespace(rising=0) %}
-            {% for kw in keywords %}{% if ai_data.get(kw, {}).get('trend') == 'rising' %}{% set ns.rising = ns.rising + 1 %}{% endif %}{% endfor %}
-            <p class="text-2xl font-bold text-gray-900">{{ ns.rising }}</p>
+            <p class="text-2xl font-bold text-gray-900">{{ rising_count }}</p>
             <p class="text-xs text-gray-400">Rising Keywords</p>
         </div>
-        <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-5 text-center card-hover">
+        <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-purple-500 text-[28px] mb-1">local_atm</span>
-            {% set ns2 = namespace(total=0, count=0) %}
-            {% for kw in keywords %}{% if ai_data.get(kw, {}).get('estimated_cpc', 0) > 0 %}{% set ns2.total = ns2.total + ai_data.get(kw, {}).get('estimated_cpc', 0) %}{% set ns2.count = ns2.count + 1 %}{% endif %}{% endfor %}
-            <p class="text-2xl font-bold text-gray-900">${{ '%.2f'|format(ns2.total / ns2.count if ns2.count > 0 else 0) }}</p>
+            <p class="text-2xl font-bold text-gray-900">${{ avg_cpc }}</p>
             <p class="text-xs text-gray-400">Avg CPC</p>
         </div>
     </div>
 
-    {# ── AI Insights Table ── #}
+    {# ═══════════════════════════════════════
+       SECTION 1: AI KEYWORD INSIGHTS
+    ═══════════════════════════════════════ #}
     {% if ai_data %}
-    <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
         <div class="flex items-center justify-between mb-5">
             <div class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-brand text-[22px]">psychology</span>
-                <h2 class="text-lg font-semibold text-gray-800">AI Keyword Insights</h2>
+                <h2 class="text-lg font-semibold text-gray-800">Keywords & AI Insights</h2>
             </div>
-            <span class="text-xs text-gray-400">
-                {% if kw_data.get('openai') %}via OpenAI{% elif kw_data.get('google_gemini') %}via Gemini{% endif %}
-            </span>
+            <span class="text-xs text-gray-400">{% if kw_data.get('openai') %}OpenAI{% elif kw_data.get('google_gemini') %}Gemini{% endif %}</span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-gray-100">
-                        <th class="text-left py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Keyword</th>
-                        <th class="text-right py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Search Vol.</th>
-                        <th class="text-center py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Competition</th>
-                        <th class="text-right py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">CPC</th>
-                        <th class="text-center py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Intent</th>
-                        <th class="text-center py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Trend</th>
-                        <th class="text-left py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Insight</th>
+                        <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Keyword</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Vol.</th>
+                        <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Competition</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">CPC</th>
+                        <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Intent</th>
+                        <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Trend</th>
+                        <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Insight</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for kw in keywords %}
                     {% set kd = ai_data.get(kw, {}) %}
-                    <tr class="border-b border-gray-50 hover:bg-brand-50/30 transition">
-                        <td class="py-3 px-3 font-medium text-gray-800">{{ kw }}</td>
+                    <tr class="border-b border-gray-50 hover:bg-brand-50/20 transition">
+                        <td class="py-3 px-3 font-medium text-gray-800 text-sm">{{ kw }}</td>
                         <td class="py-3 px-3 text-right text-gray-600 font-mono text-xs">
-                            {% if kd.get('search_volume', 0) > 0 %}{{ '{:,}'.format(kd.search_volume) }}
-                            {% else %}<span class="text-gray-300">—</span>{% endif %}
+                            {% if kd.get('search_volume', 0) > 0 %}{{ '{:,}'.format(kd.get('search_volume')) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                         </td>
                         <td class="py-3 px-3 text-center">
                             {% set comp = kd.get('competition', '') %}
-                            {% if comp == 'HIGH' %}<span class="inline-flex px-2 py-0.5 rounded-md text-xs font-medium bg-red-50 text-red-600 border border-red-200">High</span>
-                            {% elif comp == 'MEDIUM' %}<span class="inline-flex px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-600 border border-amber-200">Med</span>
-                            {% elif comp == 'LOW' %}<span class="inline-flex px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
+                            {% if comp == 'HIGH' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">High</span>
+                            {% elif comp == 'MEDIUM' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-600 border border-amber-200">Med</span>
+                            {% elif comp == 'LOW' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
                             {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
                         </td>
-                        <td class="py-3 px-3 text-right text-gray-600 font-mono text-xs">
-                            {% if kd.get('estimated_cpc', 0) > 0 %}${{ '%.2f'|format(kd.estimated_cpc) }}
-                            {% else %}<span class="text-gray-300">—</span>{% endif %}
+                        <td class="py-3 px-3 text-right font-mono text-xs text-gray-600">
+                            {% if kd.get('estimated_cpc', 0) > 0 %}${{ '%.2f'|format(kd.get('estimated_cpc', 0)) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                         </td>
                         <td class="py-3 px-3 text-center">
                             {% set intent = kd.get('intent', '') %}
-                            {% if intent %}
-                            <span class="inline-flex px-2 py-0.5 rounded-md text-xs font-medium
-                                {% if intent == 'commercial' %}bg-purple-50 text-purple-600
-                                {% elif intent == 'transactional' %}bg-blue-50 text-blue-600
-                                {% elif intent == 'informational' %}bg-gray-100 text-gray-600
-                                {% else %}bg-gray-100 text-gray-500{% endif %}">{{ intent | capitalize }}</span>
-                            {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
+                            {% if intent %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium {% if intent == 'commercial' %}bg-purple-50 text-purple-600{% elif intent == 'transactional' %}bg-blue-50 text-blue-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ intent|capitalize }}</span>{% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
                         </td>
-                        <td class="py-3 px-3 text-center text-lg font-bold">
+                        <td class="py-3 px-3 text-center font-bold text-base">
                             {% set trend = kd.get('trend', '') %}
-                            {% if trend == 'rising' %}<span class="text-emerald-500" title="Rising">↑</span>
-                            {% elif trend == 'declining' %}<span class="text-red-400" title="Declining">↓</span>
-                            {% elif trend == 'stable' %}<span class="text-gray-400" title="Stable">→</span>
+                            {% if trend == 'rising' %}<span class="text-emerald-500">↑</span>
+                            {% elif trend == 'declining' %}<span class="text-red-400">↓</span>
+                            {% elif trend == 'stable' %}<span class="text-gray-400">→</span>
                             {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
                         </td>
-                        <td class="py-3 px-3 text-gray-500 text-xs max-w-[220px]" title="{{ kd.get('insight', '') }}">
-                            <span class="line-clamp-2">{{ kd.get('insight', '') }}</span>
-                        </td>
+                        <td class="py-3 px-3 text-gray-500 text-xs max-w-xs" title="{{ kd.get('insight', '') }}">{{ (kd.get('insight', '') or '')[:80] }}{% if kd.get('insight', '')|length > 80 %}…{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -177,9 +176,11 @@
     </div>
     {% endif %}
 
-    {# ── YouTube Table ── #}
+    {# ═══════════════════════════════════════
+       SECTION 2: YOUTUBE PERFORMANCE
+    ═══════════════════════════════════════ #}
     {% if yt_data %}
-    <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
         <div class="flex items-center gap-2 mb-5">
             <span class="material-symbols-outlined text-red-500 text-[22px]">play_circle</span>
             <h2 class="text-lg font-semibold text-gray-800">YouTube Performance</h2>
@@ -188,30 +189,30 @@
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-gray-100">
-                        <th class="text-left py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Keyword</th>
-                        <th class="text-right py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Videos</th>
-                        <th class="text-right py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Avg Views</th>
-                        <th class="text-right py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Engagement</th>
-                        <th class="text-center py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Competition</th>
-                        <th class="text-left py-3 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Top Channels</th>
+                        <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Keyword</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Videos</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Avg Views</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Engagement</th>
+                        <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Competition</th>
+                        <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Top Channels</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for kw in keywords %}
                     {% set yd = yt_data.get(kw, {}) %}
                     <tr class="border-b border-gray-50 hover:bg-red-50/20 transition">
-                        <td class="py-3 px-3 font-medium text-gray-800">{{ kw }}</td>
-                        <td class="py-3 px-3 text-right text-gray-600 font-mono text-xs">{{ '{:,}'.format(yd.get('total_videos', 0)) }}</td>
-                        <td class="py-3 px-3 text-right text-gray-600 font-mono text-xs">{{ '{:,}'.format(yd.get('avg_views_per_video', 0)) }}</td>
-                        <td class="py-3 px-3 text-right text-gray-600 font-mono text-xs">{{ yd.get('engagement_rate', 0) }}%</td>
+                        <td class="py-3 px-3 font-medium text-gray-800 text-sm">{{ kw }}</td>
+                        <td class="py-3 px-3 text-right font-mono text-xs text-gray-600">{{ '{:,}'.format(yd.get('total_videos', 0)) }}</td>
+                        <td class="py-3 px-3 text-right font-mono text-xs text-gray-600">{{ '{:,}'.format(yd.get('avg_views_per_video', 0)) }}</td>
+                        <td class="py-3 px-3 text-right font-mono text-xs text-gray-600">{{ yd.get('engagement_rate', 0) }}%</td>
                         <td class="py-3 px-3 text-center">
                             {% set comp = yd.get('competition', '') %}
-                            {% if comp == 'HIGH' %}<span class="inline-flex px-2 py-0.5 rounded-md text-xs font-medium bg-red-50 text-red-600 border border-red-200">High</span>
-                            {% elif comp == 'MEDIUM' %}<span class="inline-flex px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-600 border border-amber-200">Med</span>
-                            {% elif comp == 'LOW' %}<span class="inline-flex px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
+                            {% if comp == 'HIGH' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">High</span>
+                            {% elif comp == 'MEDIUM' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-600 border border-amber-200">Med</span>
+                            {% elif comp == 'LOW' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
                             {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
                         </td>
-                        <td class="py-3 px-3 text-gray-500 text-xs">{{ yd.get('top_channels', [])[:3] | join(', ') }}</td>
+                        <td class="py-3 px-3 text-xs text-gray-500">{{ (yd.get('top_channels', []) or [])[:3] | join(', ') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -220,54 +221,211 @@
     </div>
     {% endif %}
 
-    {# ── Running ── #}
-    {% elif report.status == 'running' %}
-    <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
-        <span class="material-symbols-outlined text-amber-400 text-[56px] mb-4 block" style="animation: spin 2s linear infinite;">sync</span>
-        <h3 class="text-xl font-semibold text-gray-700 mb-2">Collecting data from all sources...</h3>
-        <p class="text-sm text-gray-400 mb-6">This usually takes 30–60 seconds. Page refreshes automatically.</p>
-        {% set metadata = data.get('metadata', {}) %}
-        {% if metadata.get('sources_succeeded') %}
-        <p class="text-xs text-emerald-600">✓ Completed: {{ metadata.sources_succeeded | join(', ') }}</p>
-        {% endif %}
-    </div>
-    <script>setTimeout(() => location.reload(), 5000);</script>
-
-    {# ── Pending ── #}
-    {% elif report.status == 'pending' %}
-    <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
-        <span class="material-symbols-outlined text-gray-300 text-[56px] mb-4 block">hourglass_empty</span>
-        <h3 class="text-xl font-semibold text-gray-700 mb-2">Report queued</h3>
-        <p class="text-sm text-gray-400">Waiting for worker to start. Make sure Celery is running.</p>
-    </div>
-    <script>setTimeout(() => location.reload(), 5000);</script>
-
-    {# ── Failed ── #}
-    {% elif report.status == 'failed' %}
-    <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
-        <span class="material-symbols-outlined text-red-400 text-[56px] mb-4 block">error_outline</span>
-        <h3 class="text-xl font-semibold text-gray-700 mb-2">Report failed</h3>
-        {% set errors = data.get('metadata', {}).get('errors', {}) %}
-        {% if errors %}
-        <div class="text-left max-w-lg mx-auto mt-4 space-y-1">
-            {% for src, err in errors.items() %}
-            <p class="text-xs text-gray-500"><span class="font-medium text-gray-700">{{ src }}:</span> {{ err }}</p>
-            {% endfor %}
+    {# ═══════════════════════════════════════
+       SECTION 3: ONLINE SENTIMENT
+    ═══════════════════════════════════════ #}
+    {% if sentiment_data %}
+    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
+        <div class="flex items-center gap-2 mb-5">
+            <span class="material-symbols-outlined text-purple-500 text-[22px]">sentiment_satisfied</span>
+            <h2 class="text-lg font-semibold text-gray-800">Online Sentiment</h2>
+        </div>
+        {% for kw in keywords %}
+        {% set sd = sentiment_data.get(kw, {}) %}
+        {% if sd.get('total_analyzed', 0) > 0 %}
+        <div class="mb-6 pb-6 border-b border-gray-100 last:border-0 last:mb-0 last:pb-0">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-gray-700 text-sm">{{ kw }}</h3>
+                <span class="text-xs text-gray-400">{{ sd.get('total_analyzed', 0) }} comments analyzed</span>
+            </div>
+            <div class="flex gap-3 mb-4">
+                <div class="flex-1 bg-emerald-50 rounded-xl p-3 text-center">
+                    <p class="text-2xl font-bold text-emerald-600">{{ sd.get('positive_pct', 0) }}%</p>
+                    <p class="text-xs text-emerald-500">😊 Positive</p>
+                </div>
+                <div class="flex-1 bg-gray-50 rounded-xl p-3 text-center">
+                    <p class="text-2xl font-bold text-gray-500">{{ sd.get('neutral_pct', 0) }}%</p>
+                    <p class="text-xs text-gray-400">😐 Neutral</p>
+                </div>
+                <div class="flex-1 bg-red-50 rounded-xl p-3 text-center">
+                    <p class="text-2xl font-bold text-red-500">{{ sd.get('negative_pct', 0) }}%</p>
+                    <p class="text-xs text-red-400">😠 Negative</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                {% if sd.get('top_positive') %}
+                <div>
+                    <p class="text-xs font-semibold text-emerald-600 mb-2">Top 5 Positive</p>
+                    {% for c in sd.get('top_positive', [])[:5] %}
+                    <div class="bg-emerald-50/50 rounded-lg p-2 mb-1 text-xs text-gray-600">"{{ c.get('text', '')[:120] }}"<span class="text-emerald-500 ml-1 font-medium">+{{ c.get('score', 0) }}</span></div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if sd.get('top_negative') %}
+                <div>
+                    <p class="text-xs font-semibold text-red-500 mb-2">Top 5 Negative</p>
+                    {% for c in sd.get('top_negative', [])[:5] %}
+                    <div class="bg-red-50/50 rounded-lg p-2 mb-1 text-xs text-gray-600">"{{ c.get('text', '')[:120] }}"<span class="text-red-400 ml-1 font-medium">{{ c.get('score', 0) }}</span></div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
         </div>
         {% endif %}
-    </div>
-
-    {# ── No data yet ── #}
-    {% else %}
-    <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-16 text-center">
-        <span class="material-symbols-outlined text-gray-300 text-[56px] mb-4 block">description</span>
-        <h3 class="text-xl font-semibold text-gray-700 mb-2">No data available</h3>
-        <p class="text-sm text-gray-400">Run the report from the client page to start collecting.</p>
+        {% endfor %}
     </div>
     {% endif %}
 
+    {# ═══════════════════════════════════════
+       SECTION 4: BRAND MONITORING (GOOGLE NEWS)
+    ═══════════════════════════════════════ #}
+    {% if news_data %}
+    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
+        <div class="flex items-center gap-2 mb-5">
+            <span class="material-symbols-outlined text-blue-500 text-[22px]">newspaper</span>
+            <h2 class="text-lg font-semibold text-gray-800">Brand Monitoring & News</h2>
+        </div>
+        {% for key, nd in news_data.items() %}
+        {% if nd.get('articles') %}
+        <div class="mb-5 pb-5 border-b border-gray-100 last:border-0">
+            <h3 class="font-semibold text-gray-700 text-sm mb-3">
+                {% if nd.get('label') == 'client_brand' %}<span class="text-brand">🏢 {{ nd.get('query', key) }}</span>
+                {% elif nd.get('label') == 'competitor' %}<span class="text-gray-600">🏬 {{ nd.get('query', key) }}</span>
+                {% else %}🔍 {{ nd.get('query', key) }}{% endif %}
+                <span class="text-xs text-gray-400 font-normal ml-2">{{ nd.get('article_count', 0) }} articles</span>
+            </h3>
+            <div class="space-y-2">
+                {% for article in nd.get('articles', [])[:5] %}
+                <div class="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 transition">
+                    <span class="material-symbols-outlined text-gray-300 text-[16px] mt-0.5">article</span>
+                    <div class="flex-1 min-w-0">
+                        <a href="{{ article.get('link', '#') }}" target="_blank" class="text-sm font-medium text-gray-800 hover:text-brand transition line-clamp-1">{{ article.get('title', '') }}</a>
+                        <p class="text-xs text-gray-400 mt-0.5">{{ article.get('source', '') }} · {{ article.get('published', '')[:16] }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ═══════════════════════════════════════
+       SECTION 5: WEBSITE AMENDMENTS
+    ═══════════════════════════════════════ #}
+    {% if wayback_data %}
+    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
+        <div class="flex items-center gap-2 mb-5">
+            <span class="material-symbols-outlined text-amber-500 text-[22px]">history</span>
+            <h2 class="text-lg font-semibold text-gray-800">Website Amendments</h2>
+            <span class="text-xs text-gray-400 ml-1">Last 30 days via Wayback Machine</span>
+        </div>
+        {% for key, wd in wayback_data.items() %}
+        {% if not wd.get('message', '') == 'No websites configured to monitor' %}
+        <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="font-semibold text-gray-700 text-sm">
+                    {% if wd.get('type') == 'client' %}<span class="text-brand">🏢 {{ wd.get('label', wd.get('url', key)) }}</span>
+                    {% else %}<span class="text-gray-600">🏬 {{ wd.get('label', wd.get('url', key)) }}</span>{% endif %}
+                </h3>
+                <span class="text-xs {% if wd.get('snapshots', 0) > 0 %}text-amber-600 bg-amber-50 border border-amber-200{% else %}text-gray-400 bg-gray-100{% endif %} px-2 py-0.5 rounded-lg">
+                    {{ wd.get('snapshots', 0) }} changes detected
+                </span>
+            </div>
+            {% if wd.get('changes') %}
+            <div class="space-y-1">
+                {% for change in wd.get('changes', [])[:5] %}
+                <div class="flex items-center gap-3 text-xs text-gray-500 p-2 bg-gray-50 rounded-lg">
+                    <span class="text-amber-500 font-medium">{{ change.get('date', '') }}</span>
+                    <span class="flex-1 truncate">{{ change.get('page', '') }}</span>
+                    <a href="{{ change.get('archive_url', '#') }}" target="_blank" class="text-brand hover:underline shrink-0">View snapshot</a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-xs text-gray-400">{{ wd.get('message', 'No changes detected') }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ═══════════════════════════════════════
+       SECTION 6: META ADS
+    ═══════════════════════════════════════ #}
+    {% if ads_data %}
+    {% set has_ads = namespace(val=false) %}
+    {% for key, ad in ads_data.items() %}{% if ad.get('ads') %}{% set has_ads.val = true %}{% endif %}{% endfor %}
+    {% if has_ads.val %}
+    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
+        <div class="flex items-center gap-2 mb-5">
+            <span class="material-symbols-outlined text-blue-600 text-[22px]">campaign</span>
+            <h2 class="text-lg font-semibold text-gray-800">Ads (Meta Ad Library)</h2>
+        </div>
+        {% for key, ad in ads_data.items() %}
+        {% if ad.get('ads') %}
+        <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
+            <h3 class="font-semibold text-gray-700 text-sm mb-3">Ads for "{{ ad.get('search_term', key) }}" <span class="text-xs text-gray-400 font-normal">({{ ad.get('total', 0) }} found)</span></h3>
+            <div class="space-y-2">
+                {% for a in ad.get('ads', [])[:5] %}
+                <div class="flex items-center justify-between p-3 bg-blue-50/30 rounded-xl border border-blue-100 text-xs">
+                    <div>
+                        <p class="font-medium text-gray-800">{{ a.get('page_name', '') }}</p>
+                        <p class="text-gray-400">Started: {{ a.get('started', 'Unknown') }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-gray-500">{{ a.get('impressions', 'N/A') }} impressions</p>
+                        {% if a.get('snapshot_url') %}<a href="{{ a.get('snapshot_url') }}" target="_blank" class="text-brand hover:underline">View Ad</a>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {# ═══════════════════════════════════════
+       SECTION 7: LINKEDIN JOBS
+    ═══════════════════════════════════════ #}
+    {% if jobs_data %}
+    {% set has_jobs = namespace(val=false) %}
+    {% for key, jd in jobs_data.items() %}{% if jd.get('jobs_found', 0) > 0 %}{% set has_jobs.val = true %}{% endif %}{% endfor %}
+    {% if has_jobs.val %}
+    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
+        <div class="flex items-center gap-2 mb-5">
+            <span class="material-symbols-outlined text-blue-700 text-[22px]">work</span>
+            <h2 class="text-lg font-semibold text-gray-800">Recruitment on LinkedIn</h2>
+        </div>
+        {% for key, jd in jobs_data.items() %}
+        {% if jd.get('jobs_found', 0) > 0 %}
+        <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
+            <h3 class="font-semibold text-gray-700 text-sm mb-2">{{ jd.get('company', key) }} <span class="text-xs text-gray-400 font-normal">({{ jd.get('jobs_found', 0) }} roles found)</span></h3>
+            <div class="space-y-2">
+                {% for job in jd.get('recent_jobs', [])[:5] %}
+                <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-xs">
+                    <div>
+                        <p class="font-medium text-gray-800">{{ job.get('title', '') }}</p>
+                        <p class="text-gray-400">{{ job.get('location', '') }}</p>
+                    </div>
+                    <span class="text-gray-400">{{ job.get('posted', '')[:10] }}</span>
+                </div>
+                {% endfor %}
+                {% if jd.get('see_more_url') %}<a href="{{ jd.get('see_more_url') }}" target="_blank" class="text-xs text-brand hover:underline">See all jobs on LinkedIn →</a>{% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% endif %}{# end complete/failed #}
+
 </div>
-<style>
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-</style>
+<style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
 {% endblock %}
