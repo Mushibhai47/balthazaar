@@ -160,7 +160,7 @@ def new_client():
 # --- View Client ---
 @app.route("/clients/<int:client_id>")
 def view_client(client_id):
-    client = Client.query.get_or_404(client_id)
+    client = db.get_or_404(Client, client_id)
     report_count = sum(len(q.reports) for q in client.queries)
     return render_template("client_detail.html", client=client, report_count=report_count)
 
@@ -168,7 +168,7 @@ def view_client(client_id):
 # --- Edit Client ---
 @app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
 def edit_client(client_id):
-    client = Client.query.get_or_404(client_id)
+    client = db.get_or_404(Client, client_id)
 
     if request.method == "GET":
         tiers = SubscriptionTier.query.filter_by(is_active=True).order_by(SubscriptionTier.sort_order).all()
@@ -188,7 +188,7 @@ def edit_client(client_id):
 # --- Delete Client ---
 @app.route("/clients/<int:client_id>/delete", methods=["POST"])
 def delete_client(client_id):
-    client = Client.query.get_or_404(client_id)
+    client = db.get_or_404(Client, client_id)
     name = client.name
     db.session.delete(client)
     db.session.commit()
@@ -199,7 +199,7 @@ def delete_client(client_id):
 # --- View Report ---
 @app.route("/reports/<int:report_id>")
 def view_report(report_id):
-    report = Report.query.get_or_404(report_id)
+    report = db.get_or_404(Report, report_id)
     query = report.query
     client = query.client
     keywords = query.get_keywords()
@@ -227,7 +227,7 @@ def view_report(report_id):
 def run_report(query_id):
     from tasks import generate_keyword_report  # Import here to avoid circular imports
 
-    query = Query.query.get_or_404(query_id)
+    query = db.get_or_404(Query, query_id)
 
     # Create new report
     report = Report(query_id=query.id, status="pending")
@@ -250,7 +250,7 @@ def run_report(query_id):
 @app.route("/api/reports/<int:report_id>/status")
 def report_status(report_id):
     """API endpoint to check report generation status"""
-    report = Report.query.get_or_404(report_id)
+    report = db.get_or_404(Report, report_id)
 
     # Parse report data to get progress info
     try:
@@ -273,7 +273,7 @@ def report_status(report_id):
 # --- Toggle Auto-Run ---
 @app.route("/queries/<int:query_id>/toggle-auto", methods=["POST"])
 def toggle_auto(query_id):
-    query = Query.query.get_or_404(query_id)
+    query = db.get_or_404(Query, query_id)
     query.auto_run = not query.auto_run
     db.session.commit()
     status = "enabled" if query.auto_run else "disabled"
@@ -397,7 +397,7 @@ def create_link():
 
 @app.route("/links/<int:link_id>/toggle", methods=["POST"])
 def toggle_link(link_id):
-    link = ShareableLink.query.get_or_404(link_id)
+    link = db.get_or_404(ShareableLink, link_id)
     link.is_active = not link.is_active
     db.session.commit()
     status = "activated" if link.is_active else "deactivated"
@@ -407,7 +407,7 @@ def toggle_link(link_id):
 
 @app.route("/links/<int:link_id>/delete", methods=["POST"])
 def delete_link(link_id):
-    link = ShareableLink.query.get_or_404(link_id)
+    link = db.get_or_404(ShareableLink, link_id)
     db.session.delete(link)
     db.session.commit()
     flash("Link deleted.", "success")
@@ -450,7 +450,7 @@ def create_tier():
 
 @app.route("/settings/tiers/<int:tier_id>/edit", methods=["POST"])
 def edit_tier(tier_id):
-    tier = SubscriptionTier.query.get_or_404(tier_id)
+    tier = db.get_or_404(SubscriptionTier, tier_id)
     tier.name = request.form.get("name", tier.name).strip()
     tier.slug = request.form.get("slug", tier.slug).strip()
     tier.price = float(request.form.get("price", tier.price))
@@ -465,7 +465,7 @@ def edit_tier(tier_id):
 
 @app.route("/settings/tiers/<int:tier_id>/delete", methods=["POST"])
 def delete_tier(tier_id):
-    tier = SubscriptionTier.query.get_or_404(tier_id)
+    tier = db.get_or_404(SubscriptionTier, tier_id)
     name = tier.name
     db.session.delete(tier)
     db.session.commit()
@@ -475,7 +475,7 @@ def delete_tier(tier_id):
 
 @app.route("/settings/tiers/<int:tier_id>/toggle", methods=["POST"])
 def toggle_tier(tier_id):
-    tier = SubscriptionTier.query.get_or_404(tier_id)
+    tier = db.get_or_404(SubscriptionTier, tier_id)
     tier.is_active = not tier.is_active
     db.session.commit()
     status = "activated" if tier.is_active else "deactivated"
