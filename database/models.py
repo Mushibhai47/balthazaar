@@ -22,6 +22,7 @@ class Client(db.Model):
     contact_name = db.Column(db.String(255), nullable=False)
     contact_email = db.Column(db.String(255), nullable=False)
     subscription_tier = db.Column(db.String(50), default="trial")  # trial, 6month, 1year
+    portal_token = db.Column(db.String(64), unique=True, nullable=True)  # client self-service portal
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     competitors = db.relationship("Competitor", backref="client", cascade="all, delete-orphan")

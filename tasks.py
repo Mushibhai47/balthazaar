@@ -4,11 +4,45 @@ Celery tasks for background keyword data collection
 from celery_app import celery
 from database.models import db, Report, Query, APICredential
 from app_factory import create_app
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+# Env var fallback for credentials (used when DB credentials aren't saved)
+ENV_CREDENTIAL_MAP = {
+    'openai':        {'api_key': 'OPENAI_API_KEY'},
+    'google_gemini': {'api_key': 'GEMINI_API_KEY'},
+    'youtube':       {'api_key': 'YOUTUBE_API_KEY'},
+    'tiktok':        {'client_key': 'TIKTOK_CLIENT_KEY', 'client_secret': 'TIKTOK_CLIENT_SECRET'},
+    'instagram':     {'access_token': 'INSTAGRAM_ACCESS_TOKEN', 'app_id': 'INSTAGRAM_APP_ID', 'app_secret': 'INSTAGRAM_APP_SECRET'},
+    'ubersuggest':   {'email': 'UBERSUGGEST_EMAIL', 'password': 'UBERSUGGEST_PASSWORD'},
+    'google_ads':    {'developer_token': 'GOOGLE_ADS_DEVELOPER_TOKEN', 'client_id': 'GOOGLE_ADS_CLIENT_ID',
+                      'client_secret': 'GOOGLE_ADS_CLIENT_SECRET', 'refresh_token': 'GOOGLE_ADS_REFRESH_TOKEN',
+                      'customer_id': 'GOOGLE_ADS_CUSTOMER_ID'},
+}
+
+
+def load_credentials(service_name: str):
+    """Load credentials from DB first, fall back to environment variables"""
+    cred = APICredential.query.filter_by(service_name=service_name, is_active=True).first()
+    if cred:
+        try:
+            return cred.get_credentials()
+        except Exception as e:
+            logger.warning(f"Failed to decrypt credentials for {service_name}: {e}")
+
+    # Fallback to env vars
+    env_map = ENV_CREDENTIAL_MAP.get(service_name, {})
+    if env_map:
+        creds = {field: os.environ.get(env_var, '') for field, env_var in env_map.items()}
+        if any(v for v in creds.values()):  # at least one value present
+            logger.info(f"[{service_name}] Using credentials from environment variables")
+            return creds
+
+    return None
 
 # All collectors: credentials_required=False means they run without DB credentials
 COLLECTORS_CONFIG = [
@@ -90,18 +124,17 @@ def generate_keyword_report(self, report_id: int):
                 try:
                     logger.info(f"Collecting data from {source_name}...")
 
-                    # Determine which credentials to load
+                    # Determine which credentials to load (DB first, then env vars)
                     cred_service = cfg.get("use_credentials_from", source_name)
-                    cred = APICredential.query.filter_by(service_name=cred_service, is_active=True).first()
+                    cred_dict = load_credentials(cred_service)
 
-                    if cfg["credentials_required"] and not cred:
+                    if cfg["credentials_required"] and not cred_dict:
                         logger.warning(f"No credentials for {source_name}, skipping")
                         report_data["metadata"]["sources_failed"].append(source_name)
                         report_data["metadata"]["errors"][source_name] = "No credentials configured"
                         continue
 
-                    # Build credentials dict with context
-                    cred_dict = cred.get_credentials() if cred else {}
+                    cred_dict = cred_dict or {}
                     cred_dict.update(context)  # Inject competitor/client context
 
                     # Dynamically import and run collector
@@ -155,3 +188,44 @@ def generate_keyword_report(self, report_id: int):
                 report.status = "failed"
                 db.session.commit()
             return {"error": str(e)}
+
+
+@celery.task(name="tasks.run_scheduled_reports")
+def run_scheduled_reports():
+    """Hourly task: auto-run reports for queries with auto_run=True that are due"""
+    app = create_app()
+    with app.app_context():
+        triggered = 0
+        queries = Query.query.filter_by(auto_run=True).all()
+        for query in queries:
+            # Get the most recent report for this query
+            last_report = (Report.query
+                           .filter_by(query_id=query.id)
+                           .order_by(Report.created_at.desc())
+                           .first())
+
+            # Determine interval in hours based on frequency
+            interval_hours = {
+                'daily': 24,
+                'weekly': 168,
+                'fortnightly': 336,
+                'monthly': 720,
+            }.get(query.frequency, 720)
+
+            should_run = False
+            if not last_report:
+                should_run = True
+            elif last_report.status not in ('pending', 'running'):
+                hours_since = (datetime.utcnow() - last_report.created_at).total_seconds() / 3600
+                should_run = hours_since >= interval_hours
+
+            if should_run:
+                report = Report(query_id=query.id, status="pending")
+                db.session.add(report)
+                db.session.commit()
+                generate_keyword_report.delay(report.id)
+                logger.info(f"Auto-triggered report for query {query.id} (client: {query.client.name})")
+                triggered += 1
+
+        logger.info(f"Scheduled reports check complete — {triggered} reports triggered")
+        return {"triggered": triggered}

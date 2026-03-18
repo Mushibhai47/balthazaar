@@ -19,8 +19,15 @@ celery.conf.update(
     timezone=Config.CELERY_TIMEZONE,
     enable_utc=Config.CELERY_ENABLE_UTC,
     task_track_started=True,
-    task_time_limit=600,  # 10 minutes max per task
-    task_soft_time_limit=540,  # 9 minute soft limit
+    task_time_limit=600,
+    task_soft_time_limit=540,
+    beat_schedule={
+        'run-scheduled-reports-hourly': {
+            'task': 'tasks.run_scheduled_reports',
+            'schedule': 3600.0,  # every hour
+        },
+    },
+    broker_connection_retry_on_startup=True,
 )
 
 # Import tasks to register them with Celery

@@ -47,6 +47,14 @@ def seed_default_tiers():
 with app.app_context():
     db.create_all()
     seed_default_tiers()
+    # Migration: add portal_token column if it doesn't exist yet
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE clients ADD COLUMN portal_token VARCHAR(64)"))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists
 
 
 # --- Dashboard ---
@@ -481,6 +489,91 @@ def toggle_tier(tier_id):
     status = "activated" if tier.is_active else "deactivated"
     flash(f"Tier '{tier.name}' {status}.", "success")
     return redirect(url_for("settings"))
+
+
+# --- PDF / Print Export ---
+@app.route("/reports/<int:report_id>/print")
+def print_report(report_id):
+    report = db.get_or_404(Report, report_id)
+    query = report.query
+    client = query.client
+    keywords = query.get_keywords()
+    try:
+        data = json.loads(report.data) if report.data else {}
+    except json.JSONDecodeError:
+        data = {}
+    kw_data = data.get('keywords', {})
+    ai_data = kw_data.get('openai', kw_data.get('google_gemini', {}))
+    metadata = data.get('metadata', {})
+    return render_template("report_print.html",
+        report=report, query=query, client=client,
+        data=data, keywords=keywords, ai_data=ai_data, metadata=metadata
+    )
+
+
+# --- Client Portal ---
+@app.route("/clients/<int:client_id>/portal/generate", methods=["POST"])
+def generate_portal(client_id):
+    client = db.get_or_404(Client, client_id)
+    if not client.portal_token:
+        client.portal_token = secrets.token_urlsafe(32)
+        db.session.commit()
+    flash(f"Portal link generated for {client.name}.", "success")
+    return redirect(url_for("view_client", client_id=client.id))
+
+
+@app.route("/clients/<int:client_id>/portal/reset", methods=["POST"])
+def reset_portal(client_id):
+    client = db.get_or_404(Client, client_id)
+    client.portal_token = secrets.token_urlsafe(32)
+    db.session.commit()
+    flash("Portal link regenerated. Old link is now invalid.", "success")
+    return redirect(url_for("view_client", client_id=client.id))
+
+
+@app.route("/portal/<token>")
+def client_portal(token):
+    client = Client.query.filter_by(portal_token=token).first()
+    if not client:
+        flash("Invalid or expired portal link.", "error")
+        return redirect(url_for("dashboard"))
+    # Get all reports sorted newest first
+    all_reports = []
+    for q in client.queries:
+        for r in sorted(q.reports, key=lambda x: x.created_at, reverse=True):
+            all_reports.append((r, q))
+    return render_template("client_portal.html", client=client, all_reports=all_reports, token=token)
+
+
+@app.route("/portal/<token>/reports/<int:report_id>")
+def portal_report(token, report_id):
+    client = Client.query.filter_by(portal_token=token).first()
+    if not client:
+        flash("Invalid or expired portal link.", "error")
+        return redirect(url_for("dashboard"))
+    report = db.get_or_404(Report, report_id)
+    # Make sure report belongs to this client
+    if report.query.client_id != client.id:
+        flash("Access denied.", "error")
+        return redirect(url_for("client_portal", token=token))
+    query = report.query
+    keywords = query.get_keywords()
+    try:
+        data = json.loads(report.data) if report.data else {}
+    except json.JSONDecodeError:
+        data = {}
+    kw_data = data.get('keywords', {})
+    ai_data = kw_data.get('openai', kw_data.get('google_gemini', {}))
+    rising_count = sum(1 for kw in keywords if ai_data.get(kw, {}).get('trend') == 'rising')
+    cpc_vals = [ai_data.get(kw, {}).get('estimated_cpc', 0) for kw in keywords if ai_data.get(kw, {}).get('estimated_cpc', 0) > 0]
+    avg_cpc = round(sum(cpc_vals) / len(cpc_vals), 2) if cpc_vals else 0.0
+    metadata = data.get('metadata', {})
+    return render_template("report_detail.html",
+        report=report, query=query, client=client,
+        data=data, keywords=keywords,
+        rising_count=rising_count, avg_cpc=avg_cpc,
+        metadata=metadata, portal_token=token
+    )
 
 
 if __name__ == "__main__":

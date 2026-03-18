@@ -11,6 +11,17 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# Models to try in order (most available first)
+GEMINI_MODELS = [
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-pro",
+    "gemini-1.0-pro",
+    "gemini-pro",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-exp",
+]
+
 
 class GeminiCollector(BaseKeywordCollector):
     """Collector for Google Gemini keyword insights"""
@@ -21,77 +32,92 @@ class GeminiCollector(BaseKeywordCollector):
         if not self.api_key:
             raise ValueError("Google Gemini API key not found in credentials")
 
-        # Try newer google.genai package first, fall back to google.generativeai
+        self.client = None
+        self.model_name = None
+        self.use_new_api = False
+        self.legacy_model = None
+
+        # Try newer google.genai package first
         try:
             import google.genai as genai
             self.client = genai.Client(api_key=self.api_key)
-            self.model_name = "gemini-2.0-flash-exp"
             self.use_new_api = True
             logger.info("Using new google.genai package")
-        except (ImportError, Exception):
-            import google.generativeai as genai_old
-            genai_old.configure(api_key=self.api_key)
-            self.model = genai_old.GenerativeModel('gemini-1.5-flash-latest')
-            self.use_new_api = False
-            logger.info("Using legacy google.generativeai package")
+        except ImportError:
+            pass
+
+        # If new package not available, fall back to legacy
+        if not self.use_new_api:
+            try:
+                import google.generativeai as genai_old
+                genai_old.configure(api_key=self.api_key)
+                self.legacy_model = genai_old.GenerativeModel('gemini-pro')
+                logger.info("Using legacy google.generativeai package")
+            except Exception as e:
+                raise ValueError(f"Neither google.genai nor google.generativeai available: {e}")
+
+    def _get_working_model(self) -> str:
+        """Try models in order, return first one that responds"""
+        if self.model_name:
+            return self.model_name  # already found a working model
+
+        for model in GEMINI_MODELS:
+            try:
+                self.client.models.generate_content(model=model, contents="Hi")
+                logger.info(f"[gemini] Using model: {model}")
+                self.model_name = model
+                return model
+            except Exception as e:
+                if "NOT_FOUND" in str(e) or "404" in str(e):
+                    logger.debug(f"[gemini] Model {model} not available, trying next...")
+                    continue
+                # Other error (auth, quota) - no point trying more models
+                raise
+        raise ValueError("No working Gemini models found for this API key")
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
-        """
-        Collect keyword insights from Google Gemini
-
-        Args:
-            keywords: List of keywords to analyze
-            countries: List of countries to target
-
-        Returns:
-            Dictionary with keyword insights
-        """
         results = {}
 
-        # Process keywords in batches to avoid token limits
         batch_size = 10
         for i in range(0, len(keywords), batch_size):
             batch = keywords[i:i + batch_size]
             logger.info(f"Processing batch {i//batch_size + 1} with {len(batch)} keywords")
 
-            # Create prompt for Gemini
             prompt = self._create_prompt(batch, countries)
 
-            # Call Gemini API (handle both old and new API)
             if self.use_new_api:
+                model = self._get_working_model()
                 response = self.client.models.generate_content(
-                    model=self.model_name,
+                    model=model,
                     contents=prompt
                 )
                 response_text = response.text
             else:
-                response = self.model.generate_content(prompt)
+                response = self.legacy_model.generate_content(prompt)
                 response_text = response.text
 
-            # Parse response
             batch_results = self._parse_response(response_text, batch)
             results.update(batch_results)
 
         return results
 
     def _create_prompt(self, keywords: List[str], countries: List[str]) -> str:
-        """Create Gemini prompt for keyword analysis"""
-        countries_str = ", ".join(countries[:5])  # Limit to first 5 countries
+        countries_str = ", ".join(countries[:5])
         keywords_str = ", ".join(keywords)
 
-        prompt = f"""Analyze these keywords for competitive intelligence and market research in {countries_str}:
+        return f"""Analyze these keywords for competitive intelligence and market research in {countries_str}:
 
 Keywords: {keywords_str}
 
-For each keyword, provide a comprehensive analysis including:
+For each keyword provide:
 1. Estimated monthly search volume (realistic number)
 2. Competition level (LOW, MEDIUM, or HIGH)
-3. Estimated cost-per-click in USD (if applicable for paid advertising)
+3. Estimated cost-per-click in USD
 4. Primary search intent (informational, navigational, transactional, or commercial)
 5. Brief strategic recommendation (1 sentence)
 6. Trend direction (rising, stable, or declining)
 
-Format your response as valid JSON with this exact structure:
+Format your response as valid JSON only:
 {{
   "keyword_name": {{
     "search_volume": 10000,
@@ -105,27 +131,17 @@ Format your response as valid JSON with this exact structure:
 
 Provide ONLY the JSON object, no additional text or markdown formatting."""
 
-        return prompt
-
     def _parse_response(self, response_text: str, keywords: List[str]) -> Dict[str, Any]:
-        """Parse Gemini response into structured data"""
         try:
-            # Try to extract JSON from response
-            # Gemini sometimes wraps JSON in markdown code blocks
             json_match = re.search(r'```json\s*(.*?)\s*```', response_text, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
             else:
-                # Try to find JSON object directly
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(0)
-                else:
-                    json_str = response_text
+                json_str = json_match.group(0) if json_match else response_text
 
             parsed_data = json.loads(json_str)
 
-            # Validate and normalize data structure
             normalized_data = {}
             for keyword, data in parsed_data.items():
                 normalized_data[keyword] = {
@@ -137,38 +153,24 @@ Provide ONLY the JSON object, no additional text or markdown formatting."""
                     "trend": str(data.get("trend", "stable")).lower(),
                     "source": "google_gemini"
                 }
-
             return normalized_data
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse Gemini response as JSON: {e}")
-            logger.debug(f"Response text: {response_text}")
-
-            # Fallback: create placeholder data for keywords
-            fallback_data = {}
-            for keyword in keywords:
-                fallback_data[keyword] = {
-                    "search_volume": 0,
-                    "competition": "UNKNOWN",
-                    "estimated_cpc": 0.0,
-                    "intent": "unknown",
-                    "insight": "Failed to parse AI response",
-                    "trend": "unknown",
-                    "raw_response": response_text[:200],
-                    "source": "google_gemini"
-                }
-            return fallback_data
+            return {kw: {
+                "search_volume": 0, "competition": "UNKNOWN", "estimated_cpc": 0.0,
+                "intent": "unknown", "insight": "Failed to parse AI response",
+                "trend": "unknown", "source": "google_gemini"
+            } for kw in keywords}
 
     def validate_credentials(self) -> bool:
-        """Validate Gemini API key"""
         try:
             if self.use_new_api:
-                response = self.client.models.generate_content(
-                    model=self.model_name, contents="Hello"
-                )
+                self._get_working_model()
+                return True
             else:
-                response = self.model.generate_content("Hello")
-            return bool(response.text)
+                response = self.legacy_model.generate_content("Hello")
+                return bool(response.text)
         except Exception as e:
             logger.error(f"Gemini credential validation failed: {e}")
             return False

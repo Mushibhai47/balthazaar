@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ client.name }} — Reports Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { brand: { DEFAULT: '#6B51F0', 50: '#F3F1FE' } } } }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #F8F7FF; }
+        .glass-card { background: white; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-100 sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-brand flex items-center justify-center">
+                    <span class="text-white font-bold text-base">{{ client.name[0]|upper }}</span>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-900 text-sm">{{ client.name }}</p>
+                    <p class="text-xs text-gray-400">Intelligence Reports Portal</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-gray-400">
+                <span class="material-symbols-outlined text-[14px]">lock</span>
+                Private — Do not share this link
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 py-10">
+
+        <!-- Welcome -->
+        <div class="glass-card rounded-2xl border border-gray-100 shadow-sm p-8 mb-8">
+            <h1 class="text-2xl font-bold text-gray-900 mb-1">Your Reports</h1>
+            <p class="text-gray-500 text-sm">Competitive intelligence reports generated for <strong>{{ client.name }}</strong>. All data is collected automatically from multiple sources.</p>
+        </div>
+
+        <!-- Reports List -->
+        {% if all_reports %}
+        <div class="space-y-4">
+            {% for report, query in all_reports %}
+            {% set report_keywords = query.get_keywords() %}
+            {% set report_countries = query.get_countries() %}
+            <div class="glass-card rounded-2xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center
+                            {% if report.status == 'complete' %}bg-emerald-50{% elif report.status == 'running' %}bg-amber-50{% else %}bg-red-50{% endif %}">
+                            <span class="material-symbols-outlined text-[22px]
+                                {% if report.status == 'complete' %}text-emerald-500{% elif report.status == 'running' %}text-amber-500{% else %}text-red-400{% endif %}">
+                                {% if report.status == 'complete' %}analytics{% elif report.status == 'running' %}sync{% else %}error_outline{% endif %}
+                            </span>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <h3 class="font-semibold text-gray-900">Report #{{ report.id }}</h3>
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
+                                    {% if report.status == 'complete' %}bg-emerald-50 text-emerald-700
+                                    {% elif report.status == 'running' %}bg-amber-50 text-amber-700
+                                    {% else %}bg-red-50 text-red-600{% endif %}">
+                                    <span class="w-1.5 h-1.5 rounded-full
+                                        {% if report.status == 'complete' %}bg-emerald-400
+                                        {% elif report.status == 'running' %}bg-amber-400
+                                        {% else %}bg-red-400{% endif %}"></span>
+                                    {{ report.status|capitalize }}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-500">
+                                {% if report.generated_at %}{{ report.generated_at.strftime('%B %d, %Y at %H:%M UTC') }}
+                                {% else %}{{ report.created_at.strftime('%B %d, %Y') }}{% endif %}
+                            </p>
+                            <p class="text-xs text-gray-400 mt-1">
+                                {{ report_keywords|length }} keywords
+                                {% if report_countries %} · {{ report_countries|join(', ') }}{% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    {% if report.status == 'complete' %}
+                    <a href="/portal/{{ token }}/reports/{{ report.id }}"
+                       class="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 bg-brand text-white text-sm font-medium rounded-xl hover:opacity-90 transition">
+                        <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                        View Report
+                    </a>
+                    {% endif %}
+                </div>
+
+                {% if report.status == 'complete' and report.data %}
+                {% set rd = report.data | tojson | safe %}
+                <div class="mt-4 pt-4 border-t border-gray-50 flex items-center gap-6">
+                    {% set rdata = report.data %}
+                    <span class="text-xs text-gray-400 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[13px] text-emerald-500">check_circle</span>
+                        Report complete
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="glass-card rounded-2xl border border-gray-100 p-16 text-center">
+            <span class="material-symbols-outlined text-gray-300 text-[56px] block mb-4">analytics</span>
+            <h3 class="text-xl font-semibold text-gray-600 mb-2">No reports yet</h3>
+            <p class="text-sm text-gray-400">Your first report is being prepared. Check back soon.</p>
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="text-center mt-12 text-xs text-gray-300">
+            Powered by Balthazaar Intelligence Platform · Keep this link private
+        </div>
+    </main>
+</body>
+</html>

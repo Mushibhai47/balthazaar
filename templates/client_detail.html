@@ -40,11 +40,32 @@
                     </div>
                 </div>
             </div>
-            <a href="/clients/{{ client.id }}/edit"
-                class="flex items-center gap-1.5 text-sm stat-gradient-1 hover:opacity-90 text-white px-4 py-2 rounded-xl transition font-medium shadow-sm">
-                <span class="material-symbols-outlined text-[16px]">edit</span>
-                Edit Client
-            </a>
+            <div class="flex items-center gap-2">
+                {% if client.portal_token %}
+                <div class="text-right">
+                    <a href="/portal/{{ client.portal_token }}" target="_blank"
+                       class="flex items-center gap-1.5 text-sm bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl transition font-medium mb-1">
+                        <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                        Client Portal
+                    </a>
+                    <form action="/clients/{{ client.id }}/portal/reset" method="post" class="inline">
+                        <button type="submit" class="text-[10px] text-gray-400 hover:text-red-400 transition">↻ Regenerate link</button>
+                    </form>
+                </div>
+                {% else %}
+                <form action="/clients/{{ client.id }}/portal/generate" method="post">
+                    <button type="submit" class="flex items-center gap-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-600 border border-gray-200 px-4 py-2 rounded-xl transition font-medium">
+                        <span class="material-symbols-outlined text-[16px]">link</span>
+                        Create Portal
+                    </button>
+                </form>
+                {% endif %}
+                <a href="/clients/{{ client.id }}/edit"
+                    class="flex items-center gap-1.5 text-sm stat-gradient-1 hover:opacity-90 text-white px-4 py-2 rounded-xl transition font-medium shadow-sm">
+                    <span class="material-symbols-outlined text-[16px]">edit</span>
+                    Edit Client
+                </a>
+            </div>
         </div>
 
         {% set socials = client.get_social_handles() %}

@@ -15,6 +15,10 @@
             <div>
                 <div class="flex items-center gap-3 mb-2 flex-wrap">
                     <h1 class="text-2xl font-bold text-gray-900">Report #{{ report.id }}</h1>
+                    <a href="/reports/{{ report.id }}/print" target="_blank"
+                       class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200 transition no-print">
+                        <span class="material-symbols-outlined text-[15px]">print</span> Export PDF
+                    </a>
                     <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium
                         {% if report.status == 'complete' %}bg-emerald-50 text-emerald-700 border border-emerald-200
                         {% elif report.status == 'running' %}bg-amber-50 text-amber-700 border border-amber-200

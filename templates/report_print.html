@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ client.name }} — Report #{{ report.id }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: #1a1a2e; background: white; }
+        .print-btn { position: fixed; top: 20px; right: 20px; background: #6B51F0; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+        @media print { .print-btn { display: none; } body { padding: 0; } }
+
+        .page { max-width: 900px; margin: 0 auto; padding: 40px; }
+        .header { border-bottom: 3px solid #6B51F0; padding-bottom: 20px; margin-bottom: 28px; }
+        .header h1 { font-size: 22px; font-weight: 700; color: #1a1a2e; }
+        .header .meta { color: #64748b; font-size: 11px; margin-top: 6px; }
+        .header .brand { font-size: 11px; color: #6B51F0; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 6px; }
+
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+        .stat-box { background: #F8F7FF; border-radius: 10px; padding: 14px; text-align: center; border: 1px solid #EDE9FE; }
+        .stat-box .num { font-size: 24px; font-weight: 700; color: #6B51F0; }
+        .stat-box .label { font-size: 10px; color: #94a3b8; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        .section { margin-bottom: 28px; page-break-inside: avoid; }
+        .section-title { font-size: 13px; font-weight: 700; color: #1a1a2e; border-left: 4px solid #6B51F0; padding-left: 10px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        thead th { background: #F8F7FF; text-align: left; padding: 8px 10px; font-size: 9px; font-weight: 700; color: #6B51F0; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid #EDE9FE; }
+        tbody td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #374151; }
+        tbody tr:last-child td { border-bottom: none; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; }
+        .badge-red { background: #fef2f2; color: #dc2626; }
+        .badge-amber { background: #fffbeb; color: #d97706; }
+        .badge-green { background: #f0fdf4; color: #16a34a; }
+        .badge-purple { background: #f5f3ff; color: #7c3aed; }
+        .badge-blue { background: #eff6ff; color: #2563eb; }
+        .trend-up { color: #16a34a; font-weight: 700; }
+        .trend-down { color: #dc2626; font-weight: 700; }
+        .trend-stable { color: #94a3b8; }
+
+        .news-list { list-style: none; }
+        .news-list li { padding: 6px 0; border-bottom: 1px solid #f1f5f9; display: flex; gap: 10px; align-items: flex-start; }
+        .news-list li:last-child { border-bottom: none; }
+        .news-dot { width: 6px; height: 6px; border-radius: 50%; background: #6B51F0; flex-shrink: 0; margin-top: 4px; }
+        .news-source { font-size: 9px; color: #94a3b8; margin-top: 2px; }
+
+        .footer { border-top: 1px solid #e2e8f0; padding-top: 14px; margin-top: 28px; text-align: center; font-size: 10px; color: #94a3b8; }
+    </style>
+</head>
+<body>
+<button class="print-btn" onclick="window.print()">⬇ Download PDF</button>
+
+<div class="page">
+    <!-- Header -->
+    <div class="header">
+        <div class="brand">Balthazaar Intelligence</div>
+        <h1>{{ client.name }} — Competitive Intelligence Report</h1>
+        <div class="meta">
+            Report #{{ report.id }} &nbsp;·&nbsp;
+            {% if report.generated_at %}{{ report.generated_at.strftime('%B %d, %Y') }}{% else %}{{ report.created_at.strftime('%B %d, %Y') }}{% endif %}
+            &nbsp;·&nbsp; {{ keywords|length }} Keywords
+            &nbsp;·&nbsp; {{ query.get_countries()|join(', ') }}
+        </div>
+    </div>
+
+    <!-- Stats -->
+    {% set succeeded = metadata.get('sources_succeeded', []) %}
+    {% set kw_data = data.get('keywords', {}) %}
+    {% set ai_data_p = kw_data.get('openai', kw_data.get('google_gemini', {})) %}
+    {% set cpc_vals = [] %}
+    {% for kw in keywords %}{% if ai_data_p.get(kw, {}).get('estimated_cpc', 0) > 0 %}{% set _ = cpc_vals.append(ai_data_p.get(kw, {}).get('estimated_cpc', 0)) %}{% endif %}{% endfor %}
+
+    <div class="stats-row">
+        <div class="stat-box">
+            <div class="num">{{ keywords|length }}</div>
+            <div class="label">Keywords</div>
+        </div>
+        <div class="stat-box">
+            <div class="num">{{ succeeded|length }}/12</div>
+            <div class="label">Sources</div>
+        </div>
+        <div class="stat-box">
+            <div class="num">{{ ai_data_p.values() | selectattr('trend', 'equalto', 'rising') | list | length }}</div>
+            <div class="label">Rising Keywords</div>
+        </div>
+        <div class="stat-box">
+            <div class="num">${{ '%.2f'|format(cpc_vals|sum / (cpc_vals|length) if cpc_vals else 0) }}</div>
+            <div class="label">Avg CPC</div>
+        </div>
+    </div>
+
+    <!-- AI Keywords -->
+    {% if ai_data_p %}
+    <div class="section">
+        <div class="section-title">Keyword Intelligence</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Keyword</th>
+                    <th style="text-align:right">Volume</th>
+                    <th>Competition</th>
+                    <th style="text-align:right">CPC</th>
+                    <th>Intent</th>
+                    <th>Trend</th>
+                    <th>Insight</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for kw in keywords %}
+                {% set kd = ai_data_p.get(kw, {}) %}
+                <tr>
+                    <td style="font-weight:600">{{ kw }}</td>
+                    <td style="text-align:right;font-family:monospace">{% if kd.get('search_volume', 0) > 0 %}{{ '{:,}'.format(kd.get('search_volume')) }}{% else %}—{% endif %}</td>
+                    <td>{% set c = kd.get('competition', '') %}
+                        {% if c == 'HIGH' %}<span class="badge badge-red">High</span>
+                        {% elif c == 'MEDIUM' %}<span class="badge badge-amber">Med</span>
+                        {% elif c == 'LOW' %}<span class="badge badge-green">Low</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td style="text-align:right;font-family:monospace">{% if kd.get('estimated_cpc', 0) > 0 %}${{ '%.2f'|format(kd.get('estimated_cpc', 0)) }}{% else %}—{% endif %}</td>
+                    <td>{% set i = kd.get('intent', '') %}
+                        {% if i %}<span class="badge {% if i == 'commercial' %}badge-purple{% elif i == 'transactional' %}badge-blue{% else %}badge-amber{% endif %}">{{ i|capitalize }}</span>{% else %}—{% endif %}
+                    </td>
+                    <td>{% set t = kd.get('trend', '') %}
+                        {% if t == 'rising' %}<span class="trend-up">↑ Rising</span>
+                        {% elif t == 'declining' %}<span class="trend-down">↓ Declining</span>
+                        {% elif t == 'stable' %}<span class="trend-stable">→ Stable</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td style="max-width:200px;color:#64748b">{{ (kd.get('insight', '') or '')[:90] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- YouTube -->
+    {% set yt_data = kw_data.get('youtube', {}) %}
+    {% if yt_data %}
+    <div class="section">
+        <div class="section-title">YouTube Performance</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Keyword</th>
+                    <th style="text-align:right">Videos</th>
+                    <th style="text-align:right">Avg Views</th>
+                    <th style="text-align:right">Engagement</th>
+                    <th>Competition</th>
+                    <th>Top Channels</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for kw in keywords %}
+                {% set yd = yt_data.get(kw, {}) %}
+                <tr>
+                    <td style="font-weight:600">{{ kw }}</td>
+                    <td style="text-align:right;font-family:monospace">{{ '{:,}'.format(yd.get('total_videos', 0)) }}</td>
+                    <td style="text-align:right;font-family:monospace">{{ '{:,}'.format(yd.get('avg_views_per_video', 0)) }}</td>
+                    <td style="text-align:right;font-family:monospace">{{ yd.get('engagement_rate', 0) }}%</td>
+                    <td>{% set c = yd.get('competition', '') %}
+                        {% if c == 'HIGH' %}<span class="badge badge-red">High</span>
+                        {% elif c == 'MEDIUM' %}<span class="badge badge-amber">Med</span>
+                        {% elif c == 'LOW' %}<span class="badge badge-green">Low</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td style="color:#64748b">{{ (yd.get('top_channels', []) or [])[:2]|join(', ') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Google News -->
+    {% set news_data = kw_data.get('google_news', {}) %}
+    {% if news_data %}
+    <div class="section">
+        <div class="section-title">Brand Monitoring & News</div>
+        {% for kw in keywords %}
+        {% set articles = news_data.get(kw, []) %}
+        {% if articles %}
+        <div style="margin-bottom:14px">
+            <div style="font-size:11px;font-weight:700;color:#6B51F0;margin-bottom:6px">{{ kw }}</div>
+            <ul class="news-list">
+                {% for a in articles[:4] %}
+                <li>
+                    <div class="news-dot"></div>
+                    <div>
+                        <div style="font-weight:600;color:#1a1a2e">{{ a.get('title', '')[:90] }}</div>
+                        <div class="news-source">{{ a.get('source', '') }} · {{ a.get('published', '') }}</div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- LinkedIn Jobs -->
+    {% set jobs_data = kw_data.get('linkedin_jobs', {}) %}
+    {% if jobs_data %}
+    <div class="section">
+        <div class="section-title">Competitor Recruitment Activity</div>
+        {% for company, jobs in jobs_data.items() %}
+        {% if jobs %}
+        <div style="margin-bottom:12px">
+            <div style="font-size:11px;font-weight:700;color:#1a1a2e;margin-bottom:6px">{{ company }}</div>
+            <table>
+                <tbody>
+                    {% for job in jobs[:4] %}
+                    <tr>
+                        <td style="font-weight:600">{{ job.get('title', '') }}</td>
+                        <td style="color:#64748b">{{ job.get('location', '') }}</td>
+                        <td style="color:#94a3b8;font-family:monospace;font-size:10px">{{ job.get('posted_date', '') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Website Amendments -->
+    {% set wayback_data = kw_data.get('wayback_machine', {}) %}
+    {% if wayback_data %}
+    <div class="section">
+        <div class="section-title">Website Change Monitoring (Last 30 Days)</div>
+        {% for url, wdata in wayback_data.items() %}
+        <div style="margin-bottom:10px;padding:10px;background:#F8F7FF;border-radius:8px;border:1px solid #EDE9FE">
+            <div style="font-weight:600;font-size:11px;margin-bottom:4px">{{ url }}</div>
+            <div style="color:#64748b">{{ wdata.get('changes_detected', 0) }} changes detected</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        Confidential — Generated by Balthazaar Intelligence Platform · {{ client.name }} · Report #{{ report.id }}
+    </div>
+</div>
+
+<script>
+// Auto-open print dialog after page loads
+window.onload = function() {
+    // Small delay to ensure styles are applied
+    setTimeout(function() {
+        // Don't auto-print, let user click button
+    }, 500);
+};
+</script>
+</body>
+</html>
