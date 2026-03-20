@@ -6,6 +6,7 @@ from sources.base import BaseKeywordCollector
 from typing import Dict, List, Any
 import logging
 
+import httpx
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
@@ -20,9 +21,10 @@ class OpenAICollector(BaseKeywordCollector):
         if not self.api_key:
             raise ValueError("OpenAI API key not found in credentials")
 
-        # Initialize OpenAI client with explicit parameters to avoid proxy issues
+        # Use explicit httpx client to bypass Replit proxy injection
         self.client = OpenAI(
             api_key=self.api_key,
+            http_client=httpx.Client(trust_env=False),
             timeout=30.0,
             max_retries=2
         )

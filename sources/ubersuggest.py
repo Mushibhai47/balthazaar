@@ -41,55 +41,46 @@ class UbersuggestCollector(BaseKeywordCollector):
                 results[keyword] = self._create_error_entry(keyword, "No login credentials configured")
             return results
 
+        # Selenium/Chrome not available on Replit — use requests-based scraping
         try:
-            from selenium import webdriver
-            from selenium.webdriver.common.by import By
-            from selenium.webdriver.support.ui import WebDriverWait
-            from selenium.webdriver.support import expected_conditions as EC
-            from selenium.webdriver.chrome.options import Options
-            from selenium.common.exceptions import TimeoutException, NoSuchElementException
+            import requests
+            from bs4 import BeautifulSoup
 
-            # Set up headless Chrome
-            chrome_options = Options()
-            chrome_options.add_argument("--headless")
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--window-size=1920,1080")
-            chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            session = requests.Session()
+            session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Referer': 'https://app.neilpatel.com/',
+            })
 
-            driver = webdriver.Chrome(options=chrome_options)
-            wait = WebDriverWait(driver, 15)
+            # Login via API
+            login_resp = session.post(
+                'https://app.neilpatel.com/api/user/login',
+                json={'email': self.email, 'password': self.password},
+                timeout=15
+            )
 
-            try:
-                # Login to Ubersuggest
-                logger.info("Logging into Ubersuggest...")
-                self._login(driver, wait)
+            if login_resp.status_code != 200:
+                raise Exception(f"Ubersuggest login failed: {login_resp.status_code}")
 
-                # Get country code for regional data
-                country_code = self._get_country_code(countries[0] if countries else "United States")
+            logger.info("Ubersuggest login successful")
 
-                # Collect data for each keyword
-                for keyword in keywords:
-                    logger.info(f"Collecting Ubersuggest data for keyword: {keyword}")
-
-                    try:
-                        keyword_data = self._scrape_keyword(driver, wait, keyword, country_code)
-                        results[keyword] = self._analyze_keyword_data(keyword, keyword_data)
-                    except Exception as e:
-                        logger.error(f"Error scraping Ubersuggest for '{keyword}': {e}")
-                        results[keyword] = self._create_error_entry(keyword, str(e))
-
-                    # Small delay to avoid rate limiting
-                    time.sleep(2)
-
-            finally:
-                driver.quit()
-
-        except ImportError:
-            logger.error("Selenium not installed. Install with: pip install selenium")
             for keyword in keywords:
-                results[keyword] = self._create_unavailable_entry(keyword)
+                try:
+                    resp = session.get(
+                        'https://app.neilpatel.com/api/keywords/keyword_overview',
+                        params={'keyword': keyword, 'language': 'en', 'locId': '2840'},
+                        timeout=15
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        results[keyword] = self._parse_api_response(keyword, data)
+                    else:
+                        results[keyword] = self._create_error_entry(keyword, f"API returned {resp.status_code}")
+                    time.sleep(1)
+                except Exception as e:
+                    logger.error(f"Ubersuggest error for '{keyword}': {e}")
+                    results[keyword] = self._create_error_entry(keyword, str(e))
 
         except Exception as e:
             logger.error(f"Ubersuggest collector failed: {e}")
@@ -200,6 +191,27 @@ class UbersuggestCollector(BaseKeywordCollector):
             return float(text)
         except (ValueError, AttributeError):
             return 0.0
+
+    def _parse_api_response(self, keyword: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse Ubersuggest API JSON response"""
+        kw_data = data.get('keyword', data)
+        search_volume = kw_data.get('searchVolume', kw_data.get('sv', 0)) or 0
+        cpc = kw_data.get('cpc', 0.0) or 0.0
+        seo_difficulty = kw_data.get('seo', kw_data.get('seoDifficulty', 0)) or 0
+        if seo_difficulty < 30:
+            competition = "LOW"
+        elif seo_difficulty < 60:
+            competition = "MEDIUM"
+        else:
+            competition = "HIGH"
+        return {
+            "search_volume": int(search_volume),
+            "seo_difficulty": int(seo_difficulty),
+            "estimated_cpc": float(cpc),
+            "competition": competition,
+            "source": "ubersuggest",
+            "keyword": keyword
+        }
 
     def _analyze_keyword_data(self, keyword: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze scraped Ubersuggest data"""
