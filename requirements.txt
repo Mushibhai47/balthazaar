@@ -32,3 +32,6 @@ feedparser==6.0.11
 
 # Wayback Machine / web utils
 lxml==5.1.0
+
+# Scheduling (auto-run reports without Celery)
+apscheduler==3.10.4
