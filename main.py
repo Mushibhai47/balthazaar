@@ -233,7 +233,8 @@ def view_report(report_id):
 # --- Run Report ---
 @app.route("/queries/<int:query_id>/run", methods=["POST"])
 def run_report(query_id):
-    from tasks import generate_keyword_report  # Import here to avoid circular imports
+    import threading
+    from tasks import run_report_sync
 
     query = db.get_or_404(Query, query_id)
 
@@ -242,14 +243,10 @@ def run_report(query_id):
     db.session.add(report)
     db.session.commit()
 
-    # Queue Celery task for background processing
-    try:
-        generate_keyword_report.delay(report.id)
-        flash("Report generation started! Data is being collected from all sources.", "success")
-    except Exception as e:
-        flash(f"Error starting report generation: {str(e)}. Make sure Redis and Celery are running.", "error")
-        report.status = "failed"
-        db.session.commit()
+    # Run in background thread (no Redis/Celery required)
+    t = threading.Thread(target=run_report_sync, args=(report.id,), daemon=True)
+    t.start()
+    flash("Report generation started! Data is being collected from all sources.", "success")
 
     return redirect(url_for("view_client", client_id=query.client_id))
 

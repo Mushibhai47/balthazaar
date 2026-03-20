@@ -181,12 +181,16 @@ def send_report_email(report, client, query, report_data):
         logger.error(f"Failed to send report email: {e}")
 
 
-@celery.task(bind=True, name="tasks.generate_keyword_report")
-def generate_keyword_report(self, report_id: int):
-    """Background task to collect data from all sources and build the report"""
+def run_report_sync(report_id: int):
+    """Run report generation synchronously (used by threading fallback when Redis unavailable)"""
     app = create_app()
     with app.app_context():
-        try:
+        _do_generate_report(report_id)
+
+
+def _do_generate_report(report_id: int):
+    """Core report generation logic — called by both Celery task and thread fallback"""
+    try:
             report = Report.query.get(report_id)
             if not report:
                 return {"error": "Report not found"}
@@ -303,13 +307,23 @@ def generate_keyword_report(self, report_id: int):
                 "sources_failed": len(report_data["metadata"]["sources_failed"])
             }
 
-        except Exception as e:
-            logger.error(f"Fatal error on report {report_id}: {str(e)}")
+    except Exception as e:
+        logger.error(f"Fatal error on report {report_id}: {str(e)}")
+        try:
             report = Report.query.get(report_id)
             if report:
                 report.status = "failed"
                 db.session.commit()
-            return {"error": str(e)}
+        except Exception:
+            pass
+
+
+@celery.task(bind=True, name="tasks.generate_keyword_report")
+def generate_keyword_report(self, report_id: int):
+    """Celery task wrapper — delegates to core logic"""
+    app = create_app()
+    with app.app_context():
+        _do_generate_report(report_id)
 
 
 @celery.task(name="tasks.run_scheduled_reports")
