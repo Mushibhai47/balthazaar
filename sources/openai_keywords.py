@@ -6,23 +6,6 @@ from sources.base import BaseKeywordCollector
 from typing import Dict, List, Any
 import logging
 
-# Patch httpx to remove 'proxies' kwarg — fixes openai 1.12.0 + httpx>=0.28 incompatibility
-try:
-    import httpx as _httpx
-    _orig_client_init = _httpx.Client.__init__
-    def _patched_client_init(self, *args, **kwargs):
-        kwargs.pop('proxies', None)
-        _orig_client_init(self, *args, **kwargs)
-    _httpx.Client.__init__ = _patched_client_init
-
-    _orig_async_init = _httpx.AsyncClient.__init__
-    def _patched_async_init(self, *args, **kwargs):
-        kwargs.pop('proxies', None)
-        _orig_async_init(self, *args, **kwargs)
-    _httpx.AsyncClient.__init__ = _patched_async_init
-except Exception:
-    pass  # If patch fails, openai may still work fine
-
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
