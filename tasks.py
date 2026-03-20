@@ -64,6 +64,8 @@ COLLECTORS_CONFIG = [
     {"name": "google_news",     "module": "sources.google_news",        "class": "GoogleNewsCollector",     "credentials_required": False},
     {"name": "wayback_machine", "module": "sources.wayback_machine",    "class": "WaybackMachineCollector", "credentials_required": False},
     {"name": "linkedin_jobs",   "module": "sources.linkedin_jobs",      "class": "LinkedInJobsCollector",   "credentials_required": False},
+    # AI Executive Summary — runs last, requires OpenAI
+    {"name": "ai_insights",     "module": "sources.ai_insights",        "class": "AIInsightsCollector",     "credentials_required": True,  "use_credentials_from": "openai"},
 ]
 
 
