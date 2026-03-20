@@ -191,14 +191,14 @@ def run_report_sync(report_id: int):
 def _do_generate_report(report_id: int):
     """Core report generation logic — called by both Celery task and thread fallback"""
     try:
-            report = Report.query.get(report_id)
+            report = db.session.get(Report, report_id)
             if not report:
                 return {"error": "Report not found"}
 
             report.status = "running"
             db.session.commit()
 
-            query = Query.query.get(report.query_id)
+            query = db.session.get(Query, report.query_id)
             if not query:
                 report.status = "failed"
                 db.session.commit()
@@ -310,7 +310,7 @@ def _do_generate_report(report_id: int):
     except Exception as e:
         logger.error(f"Fatal error on report {report_id}: {str(e)}")
         try:
-            report = Report.query.get(report_id)
+            report = db.session.get(Report, report_id)
             if report:
                 report.status = "failed"
                 db.session.commit()
