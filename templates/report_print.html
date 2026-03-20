@@ -188,8 +188,12 @@
                 <li>
                     <div class="news-dot"></div>
                     <div>
-                        <div style="font-weight:600;color:#1a1a2e">{{ a.get('title', '')[:90] }}</div>
+                        {% if a is mapping %}
+                        <div style="font-weight:600;color:#1a1a2e">{{ (a.get('title', '') or '')[:90] }}</div>
                         <div class="news-source">{{ a.get('source', '') }} · {{ a.get('published', '') }}</div>
+                        {% else %}
+                        <div style="font-weight:600;color:#1a1a2e">{{ (a | string)[:90] }}</div>
+                        {% endif %}
                     </div>
                 </li>
                 {% endfor %}
