@@ -19,6 +19,14 @@
                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200 transition no-print">
                         <span class="material-symbols-outlined text-[15px]">print</span> Export PDF
                     </a>
+                    {% if report.status == 'complete' %}
+                    <form action="/reports/{{ report.id }}/email" method="post" class="inline no-print">
+                        <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition">
+                            <span class="material-symbols-outlined text-[15px]">mail</span> Email to Client
+                        </button>
+                    </form>
+                    {% endif %}
+                    </a>
                     <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium
                         {% if report.status == 'complete' %}bg-emerald-50 text-emerald-700 border border-emerald-200
                         {% elif report.status == 'running' %}bg-amber-50 text-amber-700 border border-amber-200

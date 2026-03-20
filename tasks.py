@@ -8,6 +8,9 @@ from datetime import datetime, timedelta
 import json
 import logging
 import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +65,120 @@ COLLECTORS_CONFIG = [
     {"name": "wayback_machine", "module": "sources.wayback_machine",    "class": "WaybackMachineCollector", "credentials_required": False},
     {"name": "linkedin_jobs",   "module": "sources.linkedin_jobs",      "class": "LinkedInJobsCollector",   "credentials_required": False},
 ]
+
+
+def send_report_email(report, client, query, report_data):
+    """Send report completion email to the client contact"""
+    smtp_host = os.environ.get('SMTP_HOST', '')
+    smtp_user = os.environ.get('SMTP_USER', '')
+    smtp_pass = os.environ.get('SMTP_PASSWORD', '')
+    smtp_port = int(os.environ.get('SMTP_PORT', 587))
+    smtp_from = os.environ.get('SMTP_FROM', smtp_user)
+    base_url = os.environ.get('BASE_URL', '')
+
+    if not smtp_host or not smtp_user or not smtp_pass:
+        try:
+            smtp_cred = APICredential.query.filter_by(service_name='smtp', is_active=True).first()
+            if smtp_cred:
+                sc = smtp_cred.get_credentials()
+                smtp_host = sc.get('host', smtp_host)
+                smtp_user = sc.get('user', smtp_user)
+                smtp_pass = sc.get('password', smtp_pass)
+                smtp_port = int(sc.get('port', smtp_port))
+                smtp_from = sc.get('from', '') or smtp_user
+                base_url = sc.get('base_url', base_url)
+        except Exception:
+            pass
+
+    if not smtp_host or not smtp_user or not smtp_pass:
+        logger.info("SMTP not configured — skipping email notification")
+        return
+    to_email = client.contact_email
+    to_name = client.contact_name
+
+    meta = report_data.get('metadata', {})
+    succeeded = len(meta.get('sources_succeeded', []))
+    kw_data = report_data.get('keywords', {})
+    ai_data = kw_data.get('openai', kw_data.get('google_gemini', {}))
+    keywords = query.get_keywords()
+    rising = sum(1 for kw in keywords if ai_data.get(kw, {}).get('trend') == 'rising')
+    cpc_vals = [ai_data.get(kw, {}).get('estimated_cpc', 0) for kw in keywords if ai_data.get(kw, {}).get('estimated_cpc', 0) > 0]
+    avg_cpc = round(sum(cpc_vals) / len(cpc_vals), 2) if cpc_vals else 0.0
+    portal_path = f"/portal/{client.portal_token}" if client.portal_token else f"/reports/{report.id}"
+    report_url = f"{base_url.rstrip('/')}{portal_path}" if base_url else portal_path
+    date_str = report.generated_at.strftime('%B %d, %Y') if report.generated_at else datetime.utcnow().strftime('%B %d, %Y')
+
+    # Build keyword rows for email
+    kw_rows = ""
+    for kw in keywords[:8]:
+        kd = ai_data.get(kw, {})
+        vol = '{:,}'.format(kd.get('search_volume', 0)) if kd.get('search_volume', 0) > 0 else '—'
+        cpc = f"${kd.get('estimated_cpc', 0):.2f}" if kd.get('estimated_cpc', 0) > 0 else '—'
+        trend = {'rising': '↑', 'declining': '↓', 'stable': '→'}.get(kd.get('trend', ''), '—')
+        trend_color = {'rising': '#16a34a', 'declining': '#dc2626', 'stable': '#94a3b8'}.get(kd.get('trend', ''), '#94a3b8')
+        kw_rows += f"""<tr><td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-weight:600">{kw}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:monospace">{vol}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:monospace">{cpc}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;text-align:center;color:{trend_color};font-weight:700">{trend}</td></tr>"""
+
+    html = f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8f7ff;font-family:'Helvetica Neue',Arial,sans-serif">
+<div style="max-width:600px;margin:40px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(107,81,240,0.08)">
+  <div style="background:linear-gradient(135deg,#6B51F0,#8B5CF6);padding:36px 40px;text-align:center">
+    <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Balthazaar Intelligence</div>
+    <h1 style="color:white;margin:0;font-size:24px;font-weight:700">Your Report is Ready</h1>
+    <p style="color:rgba(255,255,255,0.8);margin:8px 0 0;font-size:14px">{client.name} — {date_str}</p>
+  </div>
+  <div style="padding:36px 40px">
+    <p style="color:#374151;font-size:15px;margin:0 0 24px">Hi {to_name},</p>
+    <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 28px">Your latest competitive intelligence report has been generated with data from <strong>{succeeded} sources</strong>.</p>
+    <div style="display:flex;gap:12px;margin-bottom:28px">
+      <div style="flex:1;background:#f5f3ff;border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#6B51F0">{len(keywords)}</div>
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Keywords</div>
+      </div>
+      <div style="flex:1;background:#f0fdf4;border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#16a34a">{rising}</div>
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Rising</div>
+      </div>
+      <div style="flex:1;background:#fffbeb;border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#d97706">${avg_cpc}</div>
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Avg CPC</div>
+      </div>
+      <div style="flex:1;background:#f0f9ff;border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#0284c7">{succeeded}/12</div>
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Sources</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:28px;font-size:13px">
+      <thead><tr style="background:#f8f7ff">
+        <th style="padding:10px 12px;text-align:left;font-size:10px;color:#6B51F0;text-transform:uppercase;letter-spacing:0.06em">Keyword</th>
+        <th style="padding:10px 12px;text-align:right;font-size:10px;color:#6B51F0;text-transform:uppercase;letter-spacing:0.06em">Volume</th>
+        <th style="padding:10px 12px;text-align:right;font-size:10px;color:#6B51F0;text-transform:uppercase;letter-spacing:0.06em">CPC</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;color:#6B51F0;text-transform:uppercase;letter-spacing:0.06em">Trend</th>
+      </tr></thead>
+      <tbody>{kw_rows}</tbody>
+    </table>
+    <div style="text-align:center;margin-bottom:28px">
+      <a href="{report_url}" style="display:inline-block;background:linear-gradient(135deg,#6B51F0,#8B5CF6);color:white;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;font-size:15px">View Full Report →</a>
+    </div>
+    <p style="color:#94a3b8;font-size:12px;text-align:center;margin:0">This is an automated report from Balthazaar Intelligence. Keep this email private.</p>
+  </div>
+</div></body></html>"""
+
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"[{client.name}] Intelligence Report Ready — {date_str}"
+        msg['From'] = f"Balthazaar Intelligence <{smtp_from}>"
+        msg['To'] = f"{to_name} <{to_email}>"
+        msg.attach(MIMEText(html, 'html'))
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_from, [to_email], msg.as_string())
+        logger.info(f"Report email sent to {to_email}")
+    except Exception as e:
+        logger.error(f"Failed to send report email: {e}")
 
 
 @celery.task(bind=True, name="tasks.generate_keyword_report")
@@ -167,6 +284,11 @@ def generate_keyword_report(self, report_id: int):
                 report.status = "complete"
                 report.generated_at = datetime.utcnow()
                 logger.info(f"Report {report_id} complete — {len(report_data['metadata']['sources_succeeded'])} sources succeeded")
+                # Send email notification
+                try:
+                    send_report_email(report, client, query, report_data)
+                except Exception as e:
+                    logger.warning(f"Email notification failed (non-fatal): {e}")
             else:
                 report.status = "failed"
                 logger.error(f"Report {report_id} failed — no sources succeeded")

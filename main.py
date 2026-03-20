@@ -426,7 +426,14 @@ def delete_link(link_id):
 @app.route("/settings")
 def settings():
     tiers = SubscriptionTier.query.order_by(SubscriptionTier.sort_order).all()
-    return render_template("settings.html", tiers=tiers)
+    smtp_cred = APICredential.query.filter_by(service_name='smtp').first()
+    smtp_config = {}
+    if smtp_cred:
+        try:
+            smtp_config = smtp_cred.get_credentials()
+        except Exception:
+            pass
+    return render_template("settings.html", tiers=tiers, smtp_config=smtp_config)
 
 
 @app.route("/settings/tiers/new", methods=["POST"])
@@ -488,6 +495,52 @@ def toggle_tier(tier_id):
     db.session.commit()
     status = "activated" if tier.is_active else "deactivated"
     flash(f"Tier '{tier.name}' {status}.", "success")
+    return redirect(url_for("settings"))
+
+
+# --- Email Report ---
+@app.route("/reports/<int:report_id>/email", methods=["POST"])
+def email_report(report_id):
+    from tasks import send_report_email
+    report = db.get_or_404(Report, report_id)
+    if report.status != 'complete':
+        flash("Can only email completed reports.", "error")
+        return redirect(url_for("view_report", report_id=report_id))
+    query = report.query
+    client = query.client
+    try:
+        data = json.loads(report.data) if report.data else {}
+    except json.JSONDecodeError:
+        data = {}
+    try:
+        send_report_email(report, client, query, data)
+        flash(f"Report emailed to {client.contact_email}.", "success")
+    except Exception as e:
+        flash(f"Email failed: {str(e)}", "error")
+    return redirect(url_for("view_report", report_id=report_id))
+
+
+# --- SMTP Settings ---
+@app.route("/settings/smtp", methods=["POST"])
+def save_smtp():
+    """Save SMTP settings as a special APICredential entry"""
+    cred = APICredential.query.filter_by(service_name='smtp').first()
+    if not cred:
+        cred = APICredential(service_name='smtp')
+        db.session.add(cred)
+    smtp_data = {
+        'host': request.form.get('smtp_host', '').strip(),
+        'port': request.form.get('smtp_port', '587').strip(),
+        'user': request.form.get('smtp_user', '').strip(),
+        'password': request.form.get('smtp_password', '').strip(),
+        'from': request.form.get('smtp_from', '').strip(),
+        'base_url': request.form.get('base_url', '').strip(),
+    }
+    cred.set_credentials(smtp_data)
+    db.session.commit()
+    # Also write to env for current process (Celery reads from env)
+    import subprocess
+    flash("SMTP settings saved. Add these as Replit Secrets for persistence.", "success")
     return redirect(url_for("settings"))
 
 
