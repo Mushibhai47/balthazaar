@@ -209,7 +209,8 @@
     {% if jobs_data %}
     <div class="section">
         <div class="section-title">Competitor Recruitment Activity</div>
-        {% for company, jobs in jobs_data.items() %}
+        {% for company, jobs_raw in jobs_data.items() %}
+        {% set jobs = jobs_raw.values() | list if jobs_raw is mapping else jobs_raw | list %}
         {% if jobs %}
         <div style="margin-bottom:12px">
             <div style="font-size:11px;font-weight:700;color:#1a1a2e;margin-bottom:6px">{{ company }}</div>
@@ -217,9 +218,13 @@
                 <tbody>
                     {% for job in jobs[:4] %}
                     <tr>
+                        {% if job is mapping %}
                         <td style="font-weight:600">{{ job.get('title', '') }}</td>
                         <td style="color:#64748b">{{ job.get('location', '') }}</td>
                         <td style="color:#94a3b8;font-family:monospace;font-size:10px">{{ job.get('posted_date', '') }}</td>
+                        {% else %}
+                        <td style="font-weight:600">{{ job | string }}</td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
