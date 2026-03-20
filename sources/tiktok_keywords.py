@@ -36,32 +36,25 @@ class TikTokCollector(BaseKeywordCollector):
         # For production, consider using Apify's TikTok scraper (paid but more reliable)
 
         try:
+            import asyncio
             from TikTokApi import TikTokApi
 
-            # Initialize TikTok API (requires playwright browser)
-            with TikTokApi() as api:
-                for keyword in keywords:
-                    logger.info(f"Collecting TikTok data for keyword: {keyword}")
+            async def _fetch_tiktok():
+                async with TikTokApi() as api:
+                    await api.create_sessions(num_sessions=1, sleep_after=3, headless=True)
+                    for keyword in keywords:
+                        try:
+                            hashtag = keyword.replace(" ", "").lower()
+                            tag = api.hashtag(name=hashtag)
+                            videos = []
+                            async for video in tag.videos(count=20):
+                                videos.append(video)
+                            results[keyword] = self._analyze_videos(keyword, videos, tag)
+                        except Exception as e:
+                            logger.error(f"TikTok error for '{keyword}': {e}")
+                            results[keyword] = self._create_error_entry(keyword, str(e))
 
-                    try:
-                        # Search for hashtag (TikTok uses hashtags for keywords)
-                        hashtag = keyword.replace(" ", "").lower()
-
-                        # Get hashtag info
-                        hashtag_data = api.hashtag(name=hashtag)
-
-                        # Get videos for this hashtag (limit to 30 to avoid rate limits)
-                        videos = []
-                        async for video in hashtag_data.videos(count=30):
-                            videos.append(video)
-
-                        # Analyze videos
-                        keyword_insights = self._analyze_videos(keyword, videos, hashtag_data)
-                        results[keyword] = keyword_insights
-
-                    except Exception as e:
-                        logger.error(f"Error collecting TikTok data for '{keyword}': {e}")
-                        results[keyword] = self._create_error_entry(keyword, str(e))
+            asyncio.run(_fetch_tiktok())
 
         except ImportError:
             logger.warning("TikTokApi not installed. Install with: pip install TikTokApi")

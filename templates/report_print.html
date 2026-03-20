@@ -178,7 +178,8 @@
     <div class="section">
         <div class="section-title">Brand Monitoring & News</div>
         {% for kw in keywords %}
-        {% set articles = news_data.get(kw, []) %}
+        {% set articles_raw = news_data.get(kw, []) %}
+        {% set articles = articles_raw.values() | list if articles_raw is mapping else articles_raw | list %}
         {% if articles %}
         <div style="margin-bottom:14px">
             <div style="font-size:11px;font-weight:700;color:#6B51F0;margin-bottom:6px">{{ kw }}</div>

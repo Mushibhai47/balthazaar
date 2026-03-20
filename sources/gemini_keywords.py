@@ -37,24 +37,25 @@ class GeminiCollector(BaseKeywordCollector):
         self.use_new_api = False
         self.legacy_model = None
 
-        # Try newer google.genai package first
+        # Use legacy google.generativeai (more stable for this API key)
         try:
-            import google.genai as genai
-            self.client = genai.Client(api_key=self.api_key)
-            self.use_new_api = True
-            logger.info("Using new google.genai package")
-        except ImportError:
-            pass
-
-        # If new package not available, fall back to legacy
-        if not self.use_new_api:
-            try:
-                import google.generativeai as genai_old
-                genai_old.configure(api_key=self.api_key)
-                self.legacy_model = genai_old.GenerativeModel('gemini-pro')
-                logger.info("Using legacy google.generativeai package")
-            except Exception as e:
-                raise ValueError(f"Neither google.genai nor google.generativeai available: {e}")
+            import google.generativeai as genai_old
+            genai_old.configure(api_key=self.api_key)
+            # Try models in order
+            for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
+                try:
+                    m = genai_old.GenerativeModel(model_name)
+                    m.generate_content("Hi")
+                    self.legacy_model = m
+                    self.model_name = model_name
+                    logger.info(f"[gemini] Using model: {model_name}")
+                    break
+                except Exception:
+                    continue
+            if not self.legacy_model:
+                raise ValueError("No working Gemini models found")
+        except Exception as e:
+            raise ValueError(f"Gemini init failed: {e}")
 
     def _get_working_model(self) -> str:
         """Try models in order, return first one that responds"""
@@ -85,16 +86,8 @@ class GeminiCollector(BaseKeywordCollector):
 
             prompt = self._create_prompt(batch, countries)
 
-            if self.use_new_api:
-                model = self._get_working_model()
-                response = self.client.models.generate_content(
-                    model=model,
-                    contents=prompt
-                )
-                response_text = response.text
-            else:
-                response = self.legacy_model.generate_content(prompt)
-                response_text = response.text
+            response = self.legacy_model.generate_content(prompt)
+            response_text = response.text
 
             batch_results = self._parse_response(response_text, batch)
             results.update(batch_results)
