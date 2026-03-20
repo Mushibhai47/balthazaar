@@ -64,7 +64,13 @@ def dashboard():
     total_reports = db.session.query(func.count(Report.id)).scalar() or 0
     total_competitors = db.session.query(func.count(Competitor.id)).scalar() or 0
     total_queries = db.session.query(func.count(Query.id)).scalar() or 0
-    return render_template("dashboard.html", clients=clients, total_reports=total_reports, total_competitors=total_competitors, total_queries=total_queries)
+    recent_reports = (Report.query
+        .filter_by(status='complete')
+        .order_by(Report.generated_at.desc())
+        .limit(5).all())
+    return render_template("dashboard.html", clients=clients, total_reports=total_reports,
+        total_competitors=total_competitors, total_queries=total_queries,
+        recent_reports=recent_reports)
 
 
 # --- New Client + Intake Form ---
@@ -626,5 +632,53 @@ def portal_report(token, report_id):
     )
 
 
+def run_auto_scheduled_reports():
+    """Check for auto-run queries that are due and trigger reports."""
+    with app.app_context():
+        import threading
+        from tasks import run_report_sync
+        from datetime import timedelta
+        queries = Query.query.filter_by(auto_run=True).all()
+        triggered = 0
+        for query in queries:
+            last_report = (Report.query
+                           .filter_by(query_id=query.id)
+                           .order_by(Report.created_at.desc())
+                           .first())
+            interval_hours = {
+                'daily': 24, 'weekly': 168, 'fortnightly': 336, 'monthly': 720,
+            }.get(query.frequency, 720)
+            should_run = False
+            if not last_report:
+                should_run = True
+            elif last_report.status not in ('pending', 'running'):
+                hours_since = (datetime.utcnow() - last_report.created_at).total_seconds() / 3600
+                should_run = hours_since >= interval_hours
+            if should_run:
+                report = Report(query_id=query.id, status="pending")
+                db.session.add(report)
+                db.session.commit()
+                t = threading.Thread(target=run_report_sync, args=(report.id,), daemon=True)
+                t.start()
+                triggered += 1
+        if triggered:
+            import logging
+            logging.getLogger(__name__).info(f"Auto-scheduled {triggered} report(s)")
+
+
+def start_scheduler():
+    """Start APScheduler to trigger auto-run reports on a schedule."""
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(run_auto_scheduled_reports, 'interval', hours=1, id='auto_reports', replace_existing=True)
+        scheduler.start()
+        import atexit
+        atexit.register(lambda: scheduler.shutdown(wait=False))
+    except ImportError:
+        pass  # APScheduler not installed, auto-run disabled
+
+
 if __name__ == "__main__":
+    start_scheduler()
     app.run(host="0.0.0.0", port=5000, debug=True)

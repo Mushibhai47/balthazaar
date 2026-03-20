@@ -56,6 +56,36 @@
         </div>
     </div>
 
+    {% if recent_reports %}
+    <!-- Recent Reports -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800">Recent Reports</h2>
+            <span class="text-xs text-gray-400">Latest completed</span>
+        </div>
+        <div class="grid gap-3">
+            {% for report in recent_reports %}
+            {% set q = report.query %}
+            {% set c = q.client %}
+            <a href="/reports/{{ report.id }}" class="glass-card rounded-xl border border-gray-100 p-4 flex items-center justify-between card-hover animate-in">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center">
+                        <span class="material-symbols-outlined text-emerald-500 text-[18px]">analytics</span>
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800">{{ c.name }} — Report #{{ report.id }}</p>
+                        <p class="text-xs text-gray-400">{{ report.generated_at.strftime('%b %d, %Y') if report.generated_at else '' }} · {{ q.get_keywords()|length }} keywords · {{ q.get_countries()|join(', ') }}</p>
+                    </div>
+                </div>
+                <span class="text-xs text-brand font-medium flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+                </span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     {% if clients %}
     <!-- Section Header -->
     <div class="flex items-center justify-between mb-4">

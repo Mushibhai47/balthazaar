@@ -64,6 +64,8 @@ COLLECTORS_CONFIG = [
     {"name": "google_news",     "module": "sources.google_news",        "class": "GoogleNewsCollector",     "credentials_required": False},
     {"name": "wayback_machine", "module": "sources.wayback_machine",    "class": "WaybackMachineCollector", "credentials_required": False},
     {"name": "linkedin_jobs",   "module": "sources.linkedin_jobs",      "class": "LinkedInJobsCollector",   "credentials_required": False},
+    # AI Executive Summary — runs last, requires OpenAI
+    {"name": "ai_insights",     "module": "sources.ai_insights",        "class": "AIInsightsCollector",     "credentials_required": True,  "use_credentials_from": "openai"},
 ]
 
 
@@ -145,7 +147,7 @@ def send_report_email(report, client, query, report_data):
         <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Avg CPC</div>
       </div>
       <div style="flex:1;background:#f0f9ff;border-radius:12px;padding:16px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:#0284c7">{succeeded}/12</div>
+        <div style="font-size:28px;font-weight:700;color:#0284c7">{succeeded}/13</div>
         <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Sources</div>
       </div>
     </div>

@@ -53,7 +53,8 @@
             'tiktok': 'TikTok', 'instagram': 'Instagram', 'ubersuggest': 'Ubersuggest',
             'google_ads': 'Google Ads', 'ads_tracker': 'Meta Ads',
             'sentiment': 'Sentiment', 'google_news': 'Google News',
-            'wayback_machine': 'Web Amendments', 'linkedin_jobs': 'LinkedIn Jobs'
+            'wayback_machine': 'Web Amendments', 'linkedin_jobs': 'LinkedIn Jobs',
+            'ai_insights': 'AI Summary'
         } %}
 
         <div class="mt-4 pt-4 border-t border-gray-100">
@@ -100,6 +101,86 @@
     {% set wayback_data = kw_data.get('wayback_machine', {}) %}
     {% set jobs_data = kw_data.get('linkedin_jobs', {}) %}
     {% set ads_data = kw_data.get('ads_tracker', {}) %}
+    {% set insights = kw_data.get('ai_insights', {}) %}
+
+    <!-- AI Executive Summary -->
+    {% if insights and insights.get('executive_summary') %}
+    <div class="glass-card rounded-2xl border border-brand/20 bg-gradient-to-br from-brand/5 to-purple-50 p-6 mb-6">
+        <div class="flex items-start justify-between flex-wrap gap-4 mb-4">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-brand text-[22px]">auto_awesome</span>
+                <h2 class="text-lg font-semibold text-gray-800">AI Executive Summary</h2>
+                {% if insights.get('generated') %}<span class="text-xs text-brand bg-brand/10 px-2 py-0.5 rounded-full">GPT-4o</span>{% endif %}
+            </div>
+            {% if insights.get('overall_score') %}
+            <div class="text-center">
+                <div class="text-2xl font-bold text-brand">{{ insights.overall_score }}<span class="text-sm text-gray-400 font-normal">/100</span></div>
+                <div class="text-xs text-gray-400">Market Score</div>
+            </div>
+            {% endif %}
+        </div>
+        <p class="text-gray-700 text-sm leading-relaxed mb-5">{{ insights.executive_summary }}</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Opportunities -->
+            {% if insights.get('top_opportunities') %}
+            <div>
+                <h4 class="text-xs font-bold text-emerald-600 uppercase tracking-wide mb-2 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">rocket_launch</span> Opportunities
+                </h4>
+                <div class="space-y-2">
+                {% for opp in insights.top_opportunities %}
+                <div class="bg-white rounded-xl p-3 border border-emerald-100">
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                        <span class="text-xs font-semibold text-gray-800">{{ opp.title }}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-bold {% if opp.priority == 'HIGH' %}bg-emerald-100 text-emerald-700{% elif opp.priority == 'MEDIUM' %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ opp.priority }}</span>
+                    </div>
+                    <p class="text-[11px] text-gray-500 leading-relaxed">{{ opp.description }}</p>
+                </div>
+                {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Threats -->
+            {% if insights.get('competitive_threats') %}
+            <div>
+                <h4 class="text-xs font-bold text-red-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">warning</span> Threats
+                </h4>
+                <div class="space-y-2">
+                {% for threat in insights.competitive_threats %}
+                <div class="bg-white rounded-xl p-3 border border-red-100">
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                        <span class="text-xs font-semibold text-gray-800">{{ threat.competitor }}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-bold {% if threat.severity == 'HIGH' %}bg-red-100 text-red-700{% elif threat.severity == 'MEDIUM' %}bg-amber-100 text-amber-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ threat.severity }}</span>
+                    </div>
+                    <p class="text-[11px] text-gray-500 leading-relaxed">{{ threat.threat }}</p>
+                </div>
+                {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            {% if insights.get('recommended_actions') %}
+            <div>
+                <h4 class="text-xs font-bold text-brand uppercase tracking-wide mb-2 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">task_alt</span> Actions
+                </h4>
+                <ul class="space-y-1.5">
+                {% for action in insights.recommended_actions %}
+                <li class="flex items-start gap-2 bg-white rounded-xl p-3 border border-brand/10">
+                    <span class="material-symbols-outlined text-brand text-[14px] mt-0.5 flex-shrink-0">arrow_forward</span>
+                    <span class="text-[11px] text-gray-600">{{ action }}</span>
+                </li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Summary Stats -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -110,7 +191,7 @@
         </div>
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-emerald-500 text-[28px] mb-1">database</span>
-            <p class="text-2xl font-bold text-gray-900">{{ succeeded|length }}<span class="text-sm text-gray-400 font-normal">/12</span></p>
+            <p class="text-2xl font-bold text-gray-900">{{ succeeded|length }}<span class="text-sm text-gray-400 font-normal">/13</span></p>
             <p class="text-xs text-gray-400">Sources</p>
         </div>
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
