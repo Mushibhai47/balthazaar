@@ -36,31 +36,34 @@ class TikTokCollector(BaseKeywordCollector):
         # For production, consider using Apify's TikTok scraper (paid but more reliable)
 
         try:
-            import asyncio
-            from TikTokApi import TikTokApi
-
-            async def _fetch_tiktok():
-                async with TikTokApi() as api:
-                    await api.create_sessions(num_sessions=1, sleep_after=3, headless=True)
-                    for keyword in keywords:
-                        try:
-                            hashtag = keyword.replace(" ", "").lower()
-                            tag = api.hashtag(name=hashtag)
-                            videos = []
-                            async for video in tag.videos(count=20):
-                                videos.append(video)
-                            results[keyword] = self._analyze_videos(keyword, videos, tag)
-                        except Exception as e:
-                            logger.error(f"TikTok error for '{keyword}': {e}")
-                            results[keyword] = self._create_error_entry(keyword, str(e))
-
-            asyncio.run(_fetch_tiktok())
-
-        except ImportError:
-            logger.warning("TikTokApi not installed. Install with: pip install TikTokApi")
-            # Return placeholder data for all keywords
+            import requests
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Referer': 'https://www.tiktok.com/',
+            }
             for keyword in keywords:
-                results[keyword] = self._create_unavailable_entry(keyword)
+                try:
+                    hashtag = keyword.replace(" ", "").lower()
+                    resp = requests.get(
+                        f"https://www.tiktok.com/api/search/general/full/?keyword={hashtag}&offset=0&count=10",
+                        headers=headers, timeout=10
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        items = data.get('data', [])
+                        results[keyword] = {
+                            "total_videos": len(items),
+                            "hashtag": hashtag,
+                            "competition": "MEDIUM",
+                            "source": "tiktok",
+                            "keyword": keyword
+                        }
+                    else:
+                        results[keyword] = self._create_unavailable_entry(keyword)
+                except Exception as e:
+                    logger.error(f"TikTok error for '{keyword}': {e}")
+                    results[keyword] = self._create_error_entry(keyword, str(e))
 
         except Exception as e:
             logger.error(f"TikTok API initialization failed: {e}")

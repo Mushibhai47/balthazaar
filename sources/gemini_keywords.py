@@ -32,27 +32,25 @@ class GeminiCollector(BaseKeywordCollector):
         if not self.api_key:
             raise ValueError("Google Gemini API key not found in credentials")
 
-        self.client = None
+        self.genai_client = None
         self.model_name = None
-        self.use_new_api = False
-        self.legacy_model = None
 
-        # Use legacy google.generativeai (more stable for this API key)
+        # Use new google.genai package
         try:
-            import google.generativeai as genai_old
-            genai_old.configure(api_key=self.api_key)
-            # Try models in order
-            for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
+            import google.genai as genai
+            client = genai.Client(api_key=self.api_key)
+            for model_name in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
                 try:
-                    m = genai_old.GenerativeModel(model_name)
-                    m.generate_content("Hi")
-                    self.legacy_model = m
+                    client.models.generate_content(model=model_name, contents="Hi")
+                    self.genai_client = client
                     self.model_name = model_name
                     logger.info(f"[gemini] Using model: {model_name}")
                     break
-                except Exception:
-                    continue
-            if not self.legacy_model:
+                except Exception as e:
+                    if "not found" in str(e).lower() or "404" in str(e):
+                        continue
+                    raise
+            if not self.genai_client:
                 raise ValueError("No working Gemini models found")
         except Exception as e:
             raise ValueError(f"Gemini init failed: {e}")
@@ -86,7 +84,9 @@ class GeminiCollector(BaseKeywordCollector):
 
             prompt = self._create_prompt(batch, countries)
 
-            response = self.legacy_model.generate_content(prompt)
+            response = self.genai_client.models.generate_content(
+                model=self.model_name, contents=prompt
+            )
             response_text = response.text
 
             batch_results = self._parse_response(response_text, batch)
