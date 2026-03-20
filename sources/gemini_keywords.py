@@ -37,18 +37,29 @@ class GeminiCollector(BaseKeywordCollector):
         self.use_new_api = False
         self.legacy_model = None
 
-        # Use legacy google.generativeai (more stable for this API key)
+        # Try new google.genai API first (more reliable)
+        try:
+            from google import genai
+            self.client = genai.Client(api_key=self.api_key)
+            working_model = self._get_working_model()
+            self.model_name = working_model
+            self.use_new_api = True
+            logger.info(f"[gemini] Using new API with model: {working_model}")
+            return
+        except Exception as e:
+            logger.warning(f"[gemini] New API failed: {e}, trying legacy...")
+
+        # Fall back to legacy google.generativeai
         try:
             import google.generativeai as genai_old
             genai_old.configure(api_key=self.api_key)
-            # Try models in order
             for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
                 try:
                     m = genai_old.GenerativeModel(model_name)
                     m.generate_content("Hi")
                     self.legacy_model = m
                     self.model_name = model_name
-                    logger.info(f"[gemini] Using model: {model_name}")
+                    logger.info(f"[gemini] Using legacy model: {model_name}")
                     break
                 except Exception:
                     continue
@@ -86,8 +97,14 @@ class GeminiCollector(BaseKeywordCollector):
 
             prompt = self._create_prompt(batch, countries)
 
-            response = self.legacy_model.generate_content(prompt)
-            response_text = response.text
+            if self.use_new_api and self.client:
+                response = self.client.models.generate_content(
+                    model=self.model_name, contents=prompt
+                )
+                response_text = response.text
+            else:
+                response = self.legacy_model.generate_content(prompt)
+                response_text = response.text
 
             batch_results = self._parse_response(response_text, batch)
             results.update(batch_results)
