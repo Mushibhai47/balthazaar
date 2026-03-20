@@ -1,6 +1,10 @@
 """
 Celery application instance for background task processing
 """
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from celery import Celery
 from config import Config
 
