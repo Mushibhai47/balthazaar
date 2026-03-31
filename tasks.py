@@ -56,6 +56,7 @@ COLLECTORS_CONFIG = [
     {"name": "instagram",       "module": "sources.instagram_keywords", "class": "InstagramCollector",      "credentials_required": True},
     {"name": "ubersuggest",     "module": "sources.ubersuggest",        "class": "UbersuggestCollector",    "credentials_required": True},
     {"name": "website_traffic", "module": "sources.ubersuggest_traffic", "class": "UbersuggestTrafficCollector", "credentials_required": True, "use_credentials_from": "ubersuggest"},
+    {"name": "ai_visibility",   "module": "sources.ubersuggest_ai_visibility", "class": "UbersuggestAIVisibilityCollector", "credentials_required": True, "use_credentials_from": "ubersuggest"},
     {"name": "google_ads",      "module": "sources.google_ads_keywords","class": "GoogleAdsCollector",      "credentials_required": True},
     # Meta ads uses instagram credentials (access_token)
     {"name": "ads_tracker",     "module": "sources.ads_tracker",        "class": "AdsTrackerCollector",     "credentials_required": True,  "use_credentials_from": "instagram"},

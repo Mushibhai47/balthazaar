@@ -97,6 +97,7 @@
     {% set ads_data = kw_data.get('ads_tracker', {}) %}
     {% set insights = kw_data.get('ai_insights', {}) %}
     {% set traffic_data = kw_data.get('website_traffic', {}) %}
+    {% set ai_visibility = kw_data.get('ai_visibility', {}) %}
 
     <!-- AI Executive Summary -->
     {% if insights and insights.get('executive_summary') %}
@@ -269,6 +270,90 @@
                 </tbody>
             </table>
         </div>
+    </div>
+    {% endif %}
+
+    {# ═══════════════════════════════════════
+       SECTION 0b: AI SEARCH VISIBILITY
+    ═══════════════════════════════════════ #}
+    {% if ai_visibility and ai_visibility.get('client') %}
+    {% set av_client = ai_visibility.get('client', {}) %}
+    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
+        <div class="flex items-center gap-2 mb-5">
+            <span class="material-symbols-outlined text-brand text-[22px]">hub</span>
+            <h2 class="text-lg font-semibold text-gray-800">AI Search Visibility</h2>
+        </div>
+
+        {# Visibility scores row: client + competitors #}
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+            <div class="bg-brand/5 rounded-xl p-4 text-center">
+                <div class="text-xs text-gray-500 mb-1 truncate">{{ av_client.get('label', 'Client') }}</div>
+                <div class="text-3xl font-bold text-brand">{{ av_client.get('brand_visibility_pct', 0) }}%</div>
+                <div class="text-xs text-gray-400 mt-1">
+                    {% if av_client.get('industry_rank') %}Rank #{{ av_client.get('industry_rank') }} · {% endif %}
+                    {{ av_client.get('total_analyzed', 0) }} responses
+                </div>
+            </div>
+            {% for key, av in ai_visibility.items() %}
+            {% if key != 'client' and av is mapping %}
+            <div class="bg-gray-50 rounded-xl p-4 text-center">
+                <div class="text-xs text-gray-500 mb-1 truncate">{{ av.get('label', key) }}</div>
+                <div class="text-3xl font-bold text-gray-700">{{ av.get('brand_visibility_pct', 0) }}%</div>
+                <div class="text-xs text-gray-400 mt-1">
+                    {% if av.get('industry_rank') %}Rank #{{ av.get('industry_rank') }} · {% endif %}
+                    {{ av.get('total_analyzed', 0) }} responses
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        {# Top prompts for client #}
+        {% if av_client.get('top_prompts') %}
+        <div class="mb-5">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Top AI Prompts Where Brand Appears</h3>
+            <div class="space-y-2">
+                {% for p in av_client.get('top_prompts', [])[:5] %}
+                <div class="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2">
+                    <span class="text-sm text-gray-700 flex-1">{{ p.get('prompt', '') }}</span>
+                    <div class="flex items-center gap-4 ml-4">
+                        {% if p.get('rank') %}<span class="text-xs text-gray-500">Rank {{ p.get('rank') }}</span>{% endif %}
+                        {% if p.get('mentions') %}<span class="text-xs font-medium text-brand">{{ p.get('mentions') }} mentions</span>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Competitor comparison table #}
+        {% if av_client.get('competitor_comparison') %}
+        <div>
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Brand Comparison in AI Responses</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs text-gray-400 border-b border-gray-100">
+                            <th class="pb-2 font-medium">Brand</th>
+                            <th class="pb-2 font-medium text-right">Visibility</th>
+                            <th class="pb-2 font-medium text-right">Mentions</th>
+                            <th class="pb-2 font-medium text-right">Avg Rank</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for b in av_client.get('competitor_comparison', []) %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-2 font-medium text-gray-800">{{ b.get('brand', '') }}</td>
+                            <td class="py-2 text-right text-gray-700">{{ b.get('visibility', 0) }}%</td>
+                            <td class="py-2 text-right text-gray-500">{{ b.get('mentions', 0) }}</td>
+                            <td class="py-2 text-right text-gray-500">{{ b.get('avg_rank', '—') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
