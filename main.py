@@ -64,8 +64,8 @@ def dashboard():
     total_reports = db.session.query(func.count(Report.id)).scalar() or 0
     total_competitors = db.session.query(func.count(Competitor.id)).scalar() or 0
     total_queries = db.session.query(func.count(Query.id)).scalar() or 0
-    recent_reports = (Report.query
-        .filter_by(status='complete')
+    recent_reports = (db.session.query(Report)
+        .filter(Report.status == 'complete')
         .order_by(Report.generated_at.desc())
         .limit(5).all())
     return render_template("dashboard.html", clients=clients, total_reports=total_reports,
@@ -641,8 +641,8 @@ def run_auto_scheduled_reports():
         queries = Query.query.filter_by(auto_run=True).all()
         triggered = 0
         for query in queries:
-            last_report = (Report.query
-                           .filter_by(query_id=query.id)
+            last_report = (db.session.query(Report)
+                           .filter(Report.query_id == query.id)
                            .order_by(Report.created_at.desc())
                            .first())
             interval_hours = {
