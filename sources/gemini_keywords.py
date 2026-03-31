@@ -39,7 +39,14 @@ class GeminiCollector(BaseKeywordCollector):
         try:
             import google.genai as genai
             client = genai.Client(api_key=self.api_key)
-            for model_name in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
+            candidates = [
+                "models/gemini-2.5-flash",
+                "models/gemini-2.0-flash-lite",
+                "models/gemini-2.0-flash-001",
+                "models/gemini-flash-latest",
+                "models/gemini-2.5-pro",
+            ]
+            for model_name in candidates:
                 try:
                     client.models.generate_content(model=model_name, contents="Hi")
                     self.genai_client = client
@@ -47,7 +54,8 @@ class GeminiCollector(BaseKeywordCollector):
                     logger.info(f"[gemini] Using model: {model_name}")
                     break
                 except Exception as e:
-                    if "not found" in str(e).lower() or "404" in str(e):
+                    if "not found" in str(e).lower() or "404" in str(e) or "no longer available" in str(e).lower():
+                        logger.debug(f"[gemini] {model_name} unavailable, trying next...")
                         continue
                     raise
             if not self.genai_client:
