@@ -2,6 +2,7 @@
 {% block title %}Report #{{ report.id }} — {{ client.name }}{% endblock %}
 
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <div class="max-w-6xl mx-auto animate-in">
 
     <a href="/clients/{{ client.id }}" class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-brand transition mb-6">
@@ -326,7 +327,125 @@
                 </tbody>
             </table>
         </div>
+        {% if ai_data %}
+        {% set cpc_kws = [] %}
+        {% set cpc_vals = [] %}
+        {% for kw in keywords %}
+            {% set cpc = ai_data.get(kw, {}).get('estimated_cpc', 0) %}
+            {% if cpc > 0 %}
+                {% set _ = cpc_kws.append(kw) %}
+                {% set _ = cpc_vals.append(cpc) %}
+            {% endif %}
+        {% endfor %}
+        {% if cpc_kws %}
+        <div class="mt-5 pt-5 border-t border-gray-100">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">CPC Comparison (USD)</p>
+            <canvas id="cpcChart" height="80"></canvas>
+            <script>
+            (function() {
+                const labels = {{ cpc_kws[:10] | tojson }};
+                const data = {{ cpc_vals[:10] | tojson }};
+                const ctx = document.getElementById('cpcChart');
+                if (!ctx || typeof Chart === 'undefined') return;
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'CPC ($)',
+                            data: data,
+                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                            borderColor: 'rgba(16, 185, 129, 0.8)',
+                            borderWidth: 2,
+                            borderRadius: 6,
+                            borderSkipped: false,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '$' + c.parsed.y.toFixed(2) } } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { callback: v => '$'+v, font: { size: 10 } } },
+                            x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 30 } }
+                        }
+                    }
+                });
+            })();
+            </script>
+        </div>
+        {% endif %}
+        {% endif %}
     </div>
+    {% endif %}
+
+    {# ═══════════════════════════════════════
+       KEYWORD VOLUME CHART (Top 10 by Volume)
+    ═══════════════════════════════════════ #}
+    {% if ai_data %}
+    {% set chart_kws = [] %}
+    {% set chart_vols = [] %}
+    {% for kw in keywords %}
+        {% set vol = ai_data.get(kw, {}).get('search_volume', 0) %}
+        {% if vol > 0 %}
+            {% set _ = chart_kws.append(kw) %}
+            {% set _ = chart_vols.append(vol) %}
+        {% endif %}
+    {% endfor %}
+    {% if chart_kws %}
+    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
+        <div class="flex items-center gap-2 mb-5">
+            <span class="material-symbols-outlined text-brand text-[22px]">bar_chart</span>
+            <h2 class="text-lg font-semibold text-gray-800">Keyword Volume — Top {{ [chart_kws|length, 10]|min }}</h2>
+            <span class="text-xs text-gray-400 ml-auto">Search volume by keyword</span>
+        </div>
+        <canvas id="kwVolumeChart" height="120"></canvas>
+        <script>
+        (function() {
+            const labels = {{ chart_kws[:10] | tojson }};
+            const data = {{ chart_vols[:10] | tojson }};
+            const ctx = document.getElementById('kwVolumeChart');
+            if (!ctx) return;
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Monthly Volume',
+                        data: data,
+                        backgroundColor: 'rgba(107, 81, 240, 0.15)',
+                        borderColor: 'rgba(107, 81, 240, 0.8)',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => 'Volume: ' + ctx.parsed.y.toLocaleString()
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.04)' },
+                            ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v, font: { size: 11 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 10 }, maxRotation: 30 }
+                        }
+                    }
+                }
+            });
+        })();
+        </script>
+    </div>
+    {% endif %}
     {% endif %}
 
     {# ═══════════════════════════════════════
