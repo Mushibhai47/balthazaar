@@ -511,12 +511,13 @@ def email_report(report_id):
         return redirect(url_for("view_report", report_id=report_id))
     query = report.query
     client = query.client
+    note = request.form.get('note', '').strip()
     try:
         data = json.loads(report.data) if report.data else {}
     except json.JSONDecodeError:
         data = {}
     try:
-        send_report_email(report, client, query, data)
+        send_report_email(report, client, query, data, note=note)
         flash(f"Report emailed to {client.contact_email}.", "success")
     except Exception as e:
         flash(f"Email failed: {str(e)}", "error")
