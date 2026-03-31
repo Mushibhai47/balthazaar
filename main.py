@@ -228,11 +228,12 @@ def view_report(report_id):
     avg_cpc = round(sum(cpc_vals) / len(cpc_vals), 2) if cpc_vals else 0.0
     metadata = data.get('metadata', {})
 
+    competitors = client.competitors
     return render_template("report_detail.html",
         report=report, query=query, client=client,
         data=data, keywords=keywords,
         rising_count=rising_count, avg_cpc=avg_cpc,
-        metadata=metadata
+        metadata=metadata, competitors=competitors
     )
 
 
@@ -511,16 +512,65 @@ def email_report(report_id):
         return redirect(url_for("view_report", report_id=report_id))
     query = report.query
     client = query.client
+    note = request.form.get('note', '').strip()
     try:
         data = json.loads(report.data) if report.data else {}
     except json.JSONDecodeError:
         data = {}
     try:
-        send_report_email(report, client, query, data)
+        send_report_email(report, client, query, data, note=note)
         flash(f"Report emailed to {client.contact_email}.", "success")
     except Exception as e:
         flash(f"Email failed: {str(e)}", "error")
     return redirect(url_for("view_report", report_id=report_id))
+
+
+# --- Edit Executive Summary ---
+@app.route("/reports/<int:report_id>/edit-summary", methods=["POST"])
+def edit_summary(report_id):
+    report = db.get_or_404(Report, report_id)
+    try:
+        data = json.loads(report.data) if report.data else {}
+    except json.JSONDecodeError:
+        data = {}
+    kw_data = data.get('keywords', {})
+    ai_data = kw_data.get('ai_insights', {})
+    # Update fields from form
+    ai_data['executive_summary'] = request.form.get('executive_summary', ai_data.get('executive_summary', ''))
+    # Parse opportunities
+    opp_titles = request.form.getlist('opp_title[]')
+    opp_descs = request.form.getlist('opp_desc[]')
+    opp_prios = request.form.getlist('opp_priority[]')
+    if opp_titles:
+        ai_data['top_opportunities'] = [
+            {'title': t, 'description': d, 'priority': p}
+            for t, d, p in zip(opp_titles, opp_descs, opp_prios) if t.strip()
+        ]
+    # Parse threats
+    threat_comps = request.form.getlist('threat_comp[]')
+    threat_texts = request.form.getlist('threat_text[]')
+    threat_sevs = request.form.getlist('threat_severity[]')
+    if threat_comps:
+        ai_data['competitive_threats'] = [
+            {'competitor': c, 'threat': t, 'severity': s}
+            for c, t, s in zip(threat_comps, threat_texts, threat_sevs) if c.strip()
+        ]
+    # Parse actions
+    actions = request.form.getlist('action[]')
+    if actions:
+        ai_data['recommended_actions'] = [a for a in actions if a.strip()]
+    kw_data['ai_insights'] = ai_data
+    data['keywords'] = kw_data
+    report.data = json.dumps(data)
+    db.session.commit()
+    flash("Executive summary updated.", "success")
+    return redirect(url_for("view_report", report_id=report_id))
+
+
+# --- Glossary / How It Works ---
+@app.route("/glossary")
+def glossary():
+    return render_template("glossary.html")
 
 
 # --- SMTP Settings ---

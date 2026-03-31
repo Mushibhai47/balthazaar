@@ -55,6 +55,8 @@ COLLECTORS_CONFIG = [
     {"name": "tiktok",          "module": "sources.tiktok_keywords",    "class": "TikTokCollector",         "credentials_required": True},
     {"name": "instagram",       "module": "sources.instagram_keywords", "class": "InstagramCollector",      "credentials_required": True},
     {"name": "ubersuggest",     "module": "sources.ubersuggest",        "class": "UbersuggestCollector",    "credentials_required": True},
+    {"name": "website_traffic", "module": "sources.ubersuggest_traffic", "class": "UbersuggestTrafficCollector", "credentials_required": True, "use_credentials_from": "ubersuggest"},
+    {"name": "ai_visibility",   "module": "sources.ubersuggest_ai_visibility", "class": "UbersuggestAIVisibilityCollector", "credentials_required": True, "use_credentials_from": "ubersuggest"},
     {"name": "google_ads",      "module": "sources.google_ads_keywords","class": "GoogleAdsCollector",      "credentials_required": True},
     # Meta ads uses instagram credentials (access_token)
     {"name": "ads_tracker",     "module": "sources.ads_tracker",        "class": "AdsTrackerCollector",     "credentials_required": True,  "use_credentials_from": "instagram"},
@@ -69,7 +71,7 @@ COLLECTORS_CONFIG = [
 ]
 
 
-def send_report_email(report, client, query, report_data):
+def send_report_email(report, client, query, report_data, note=''):
     """Send report completion email to the client contact"""
     smtp_host = os.environ.get('SMTP_HOST', '')
     smtp_user = os.environ.get('SMTP_USER', '')
@@ -123,6 +125,9 @@ def send_report_email(report, client, query, report_data):
             <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-family:monospace">{cpc}</td>
             <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;text-align:center;color:{trend_color};font-weight:700">{trend}</td></tr>"""
 
+    # Add note to email if provided
+    note_html = f'<div style="background:#f5f3ff;border-left:4px solid #6B51F0;padding:16px;border-radius:0 8px 8px 0;margin-bottom:28px"><p style="color:#374151;font-size:14px;margin:0;font-style:italic">"{note}"</p></div>' if note else ''
+
     html = f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8f7ff;font-family:'Helvetica Neue',Arial,sans-serif">
 <div style="max-width:600px;margin:40px auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(107,81,240,0.08)">
   <div style="background:linear-gradient(135deg,#6B51F0,#8B5CF6);padding:36px 40px;text-align:center">
@@ -133,6 +138,7 @@ def send_report_email(report, client, query, report_data):
   <div style="padding:36px 40px">
     <p style="color:#374151;font-size:15px;margin:0 0 24px">Hi {to_name},</p>
     <p style="color:#374151;font-size:14px;line-height:1.6;margin:0 0 28px">Your latest competitive intelligence report has been generated with data from <strong>{succeeded} sources</strong>.</p>
+    {note_html}
     <div style="display:flex;gap:12px;margin-bottom:28px">
       <div style="flex:1;background:#f5f3ff;border-radius:12px;padding:16px;text-align:center">
         <div style="font-size:28px;font-weight:700;color:#6B51F0">{len(keywords)}</div>

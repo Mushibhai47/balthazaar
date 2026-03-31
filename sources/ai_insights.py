@@ -86,14 +86,50 @@ Respond ONLY with valid JSON. Be specific and actionable."""
                     text = text[4:]
             result = json.loads(text)
             result["generated"] = True
-            return result
 
         except json.JSONDecodeError as e:
             logger.error(f"AI insights JSON parse error: {e}")
-            return self._fallback_insights(client_name, keywords, competitor_names)
+            result = self._fallback_insights(client_name, keywords, competitor_names)
         except Exception as e:
             logger.error(f"AI insights generation failed: {e}")
-            return self._fallback_insights(client_name, keywords, competitor_names)
+            result = self._fallback_insights(client_name, keywords, competitor_names)
+
+        # Generate competitor market scores
+        competitor_scores = {}
+        competitors = self.credentials.get('_competitors', [])
+        if competitors and self.client:
+            try:
+                comp_names = [c.get('name', '') for c in competitors if c.get('name')]
+                if comp_names:
+                    score_prompt = f"""Rate these businesses on a market strength scale of 0-100 based on their competitive position in the {client_name} market.
+
+Return ONLY a JSON object like this:
+{{
+  "competitor_name": 65,
+  "another_competitor": 72
+}}
+
+Businesses to rate: {', '.join(comp_names)}
+
+Consider: brand strength, market presence, competitive threats. Return only JSON, no explanation."""
+
+                    score_response = self.client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[{"role": "user", "content": score_prompt}],
+                        temperature=0.3,
+                        max_tokens=200
+                    )
+                    score_text = score_response.choices[0].message.content.strip()
+                    # Parse JSON
+                    import re as _re
+                    json_match = _re.search(r'\{.*\}', score_text, _re.DOTALL)
+                    if json_match:
+                        competitor_scores = json.loads(json_match.group(0))
+            except Exception as e:
+                logger.warning(f"Competitor scoring failed: {e}")
+
+        result['competitor_scores'] = competitor_scores
+        return result
 
     def _fallback_insights(self, client_name, keywords, competitors):
         return {

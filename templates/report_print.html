@@ -60,14 +60,19 @@
             &nbsp;·&nbsp; {{ keywords|length }} Keywords
             &nbsp;·&nbsp; {{ query.get_countries()|join(', ') }}
         </div>
+        {% if competitors %}
+        <div class="meta" style="margin-top:4px">
+            Competitors: {{ competitors | map(attribute='name') | join(', ') }}
+        </div>
+        {% endif %}
     </div>
 
-    <!-- AI Executive Summary -->
+    <!-- Executive Summary -->
     {% set kw_data_pre = data.get('keywords', {}) %}
     {% set insights = kw_data_pre.get('ai_insights', {}) %}
     {% if insights and insights.get('executive_summary') %}
     <div class="section" style="background:#f5f3ff;border-radius:12px;padding:18px;border:1px solid #EDE9FE;margin-bottom:28px">
-        <div class="section-title" style="border-left-color:#6B51F0">AI Executive Summary</div>
+        <div class="section-title" style="border-left-color:#6B51F0">Executive Summary</div>
         <p style="color:#374151;font-size:12px;line-height:1.7;margin-bottom:14px">{{ insights.executive_summary }}</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             {% if insights.get('top_opportunities') %}
@@ -92,6 +97,7 @@
 
     <!-- Stats -->
     {% set succeeded = metadata.get('sources_succeeded', []) %}
+    {% set failed = metadata.get('sources_failed', []) %}
     {% set kw_data = data.get('keywords', {}) %}
     {% set ai_data_p = kw_data.get('openai', kw_data.get('google_gemini', {})) %}
     {% set cpc_vals = [] %}
@@ -103,7 +109,7 @@
             <div class="label">Keywords</div>
         </div>
         <div class="stat-box">
-            <div class="num">{{ succeeded|length }}/13</div>
+            <div class="num">{{ succeeded|length }}/{{ (succeeded|length + failed|length) }}</div>
             <div class="label">Sources</div>
         </div>
         <div class="stat-box">

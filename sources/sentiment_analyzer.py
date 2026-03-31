@@ -18,6 +18,7 @@ class SentimentCollector(BaseKeywordCollector):
         super().__init__(credentials)
         self.youtube_api_key = credentials.get('api_key', '')
         self.competitors = credentials.get('_competitors', [])
+        self.client_name = credentials.get('_client_name', '')
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
         results = {}
@@ -70,7 +71,79 @@ class SentimentCollector(BaseKeywordCollector):
                 'source': 'sentiment'
             }
 
+        # Brand-based sentiment (client + each competitor)
+        brands = []
+        if self.client_name:
+            brands.append({'name': self.client_name, 'type': 'client'})
+        for comp in self.competitors[:3]:
+            if comp.get('name'):
+                brands.append({'name': comp['name'], 'type': 'competitor'})
+
+        for brand in brands:
+            brand_key = f"brand_{brand['name'].lower().replace(' ', '_')}"
+            # Search for brand mentions and analyze sentiment
+            brand_texts = self._fetch_brand_texts(brand['name'])
+            if brand_texts:
+                sentiment_result = self._analyze_texts(brand_texts, analyzer)
+                sentiment_result['brand_name'] = brand['name']
+                sentiment_result['brand_type'] = brand['type']
+                sentiment_result['is_brand'] = True
+                results[brand_key] = sentiment_result
+
         return results
+
+    def _fetch_brand_texts(self, brand_name: str) -> list:
+        """Fetch text snippets about a brand from Google News RSS"""
+        try:
+            import feedparser
+            import urllib.parse
+            query = urllib.parse.quote(f'"{brand_name}"')
+            url = f"https://news.google.com/rss/search?q={query}&hl=en&gl=US&ceid=US:en"
+            feed = feedparser.parse(url)
+            texts = []
+            for entry in feed.entries[:15]:
+                text = entry.get('summary', entry.get('title', ''))
+                if text:
+                    texts.append({'text': text[:300], 'title': entry.get('title', ''),
+                                  'link': entry.get('link', ''), 'source': entry.get('source', {}).get('title', '')})
+            return texts
+        except Exception as e:
+            logger.warning(f"Brand text fetch failed for {brand_name}: {e}")
+            return []
+
+    def _analyze_texts(self, texts: list, analyzer=None) -> Dict[str, Any]:
+        """Analyze sentiment for a list of text dicts (each with a 'text' key)"""
+        if analyzer is None:
+            try:
+                from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+                analyzer = SentimentIntensityAnalyzer()
+            except ImportError:
+                analyzer = None
+
+        scored = []
+        for item in texts:
+            text = item.get('text', '')
+            if analyzer:
+                score = analyzer.polarity_scores(text)['compound']
+            else:
+                score = self._basic_score(text)
+            sentiment = 'positive' if score > 0.05 else ('negative' if score < -0.05 else 'neutral')
+            scored.append({**item, 'score': score, 'sentiment': sentiment})
+
+        total = len(scored)
+        pos = sorted([c for c in scored if c['sentiment'] == 'positive'], key=lambda x: x['score'], reverse=True)
+        neg = sorted([c for c in scored if c['sentiment'] == 'negative'], key=lambda x: x['score'])
+        neu = [c for c in scored if c['sentiment'] == 'neutral']
+
+        return {
+            'positive_pct': round(len(pos) / total * 100) if total else 0,
+            'neutral_pct': round(len(neu) / total * 100) if total else 0,
+            'negative_pct': round(len(neg) / total * 100) if total else 0,
+            'top_positive': [{'text': c['text'][:200], 'score': round(c['score'], 3), 'source': c.get('source', '')} for c in pos[:5]],
+            'top_negative': [{'text': c['text'][:200], 'score': round(c['score'], 3), 'source': c.get('source', '')} for c in neg[:5]],
+            'total_analyzed': total,
+            'source': 'sentiment'
+        }
 
     def _get_youtube_comments(self, keyword: str) -> List[Dict]:
         if not self.youtube_api_key:

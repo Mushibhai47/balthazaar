@@ -5,6 +5,7 @@ Uses YouTube Data API v3 to analyze keyword search volumes and video trends
 from sources.base import BaseKeywordCollector
 from typing import Dict, List, Any
 import logging
+import re
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -21,6 +22,8 @@ class YouTubeCollector(BaseKeywordCollector):
             raise ValueError("YouTube API key not found in credentials")
 
         self.youtube = build('youtube', 'v3', developerKey=self.api_key)
+        self.competitors = credentials.get('_competitors', [])
+        self.client_name = credentials.get('_client_name', '')
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
         """
@@ -53,7 +56,121 @@ class YouTubeCollector(BaseKeywordCollector):
                 logger.error(f"Error collecting YouTube data for '{keyword}': {e}")
                 results[keyword] = self._create_error_entry(keyword, str(e))
 
+        # Competitor channel videos
+        for comp in self.competitors[:4]:
+            comp_name = comp.get('name', '')
+            youtube_url = comp.get('youtube_url', '')
+            if not comp_name:
+                continue
+            try:
+                channel_data = self._get_channel_videos(comp_name, youtube_url)
+                results[f"_channel_{comp_name}"] = channel_data
+            except Exception as e:
+                logger.warning(f"Channel fetch failed for {comp_name}: {e}")
+                results[f"_channel_{comp_name}"] = {
+                    'company': comp_name, 'videos': [], 'error': str(e)[:100], 'is_channel': True
+                }
+
+        # Client channel too
+        if self.client_name:
+            client_comp = {'name': self.client_name, 'youtube_url': ''}
+            try:
+                results['_channel_client'] = self._get_channel_videos(self.client_name, '')
+                results['_channel_client']['is_client'] = True
+            except Exception as e:
+                logger.warning(f"Client channel fetch failed: {e}")
+
         return results
+
+    def _get_channel_videos(self, company_name: str, youtube_url: str) -> Dict[str, Any]:
+        """Fetch recent videos from a competitor/client YouTube channel"""
+        channel_id = None
+
+        # Try to extract channel ID from URL
+        if youtube_url:
+            # Handle @handle format
+            handle_match = re.search(r'@([\w-]+)', youtube_url) if hasattr(__import__('re'), 'search') else None
+            channel_match = re.search(r'channel/(UC[\w-]+)', youtube_url) if youtube_url else None
+
+            import re as _re
+            handle_match = _re.search(r'@([\w-]+)', youtube_url)
+            channel_match = _re.search(r'channel/(UC[\w-]+)', youtube_url)
+
+            if channel_match:
+                channel_id = channel_match.group(1)
+            elif handle_match:
+                # Search by handle
+                handle = handle_match.group(1)
+                try:
+                    search_resp = self.youtube.search().list(
+                        q=handle, part='snippet', type='channel', maxResults=1
+                    ).execute()
+                    if search_resp.get('items'):
+                        channel_id = search_resp['items'][0]['snippet']['channelId']
+                except Exception:
+                    pass
+
+        # If no channel ID yet, search by company name
+        if not channel_id:
+            try:
+                search_resp = self.youtube.search().list(
+                    q=f"{company_name} official", part='snippet', type='channel', maxResults=1
+                ).execute()
+                if search_resp.get('items'):
+                    channel_id = search_resp['items'][0]['snippet']['channelId']
+            except Exception as e:
+                logger.warning(f"Channel search failed for {company_name}: {e}")
+                return {'company': company_name, 'videos': [], 'total_videos': 0, 'is_channel': True}
+
+        if not channel_id:
+            return {'company': company_name, 'videos': [], 'total_videos': 0, 'is_channel': True}
+
+        # Get recent videos from channel
+        try:
+            videos_resp = self.youtube.search().list(
+                channelId=channel_id,
+                part='snippet',
+                order='date',
+                type='video',
+                maxResults=10
+            ).execute()
+
+            video_items = videos_resp.get('items', [])
+            video_ids = [v['id']['videoId'] for v in video_items if v.get('id', {}).get('videoId')]
+
+            # Get stats
+            stats = self._get_video_statistics(video_ids) if video_ids else {}
+
+            videos = []
+            for item in video_items[:8]:
+                vid_id = item.get('id', {}).get('videoId', '')
+                snippet = item.get('snippet', {})
+                s = stats.get(vid_id, {})
+                videos.append({
+                    'title': snippet.get('title', ''),
+                    'published': snippet.get('publishedAt', '')[:10],
+                    'views': s.get('viewCount', 0),
+                    'likes': s.get('likeCount', 0),
+                    'comments': s.get('commentCount', 0),
+                    'engagement_rate': round((s.get('likeCount', 0) + s.get('commentCount', 0)) / max(s.get('viewCount', 1), 1) * 100, 2),
+                    'url': f"https://youtube.com/watch?v={vid_id}" if vid_id else ''
+                })
+
+            avg_views = sum(v['views'] for v in videos) // max(len(videos), 1)
+            avg_engagement = round(sum(v['engagement_rate'] for v in videos) / max(len(videos), 1), 2)
+
+            return {
+                'company': company_name,
+                'channel_id': channel_id,
+                'videos': videos,
+                'total_videos': len(videos),
+                'avg_views': avg_views,
+                'avg_engagement_rate': avg_engagement,
+                'is_channel': True
+            }
+        except Exception as e:
+            logger.error(f"Video fetch failed for channel {channel_id}: {e}")
+            return {'company': company_name, 'channel_id': channel_id, 'videos': [], 'total_videos': 0, 'is_channel': True, 'error': str(e)[:100]}
 
     def _search_videos(self, keyword: str, countries: List[str]) -> dict:
         """
