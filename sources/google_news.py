@@ -39,6 +39,25 @@ class GoogleNewsCollector(BaseKeywordCollector):
             if name:
                 results[f"_competitor_{name}"] = self._fetch_news(name, label="competitor")
 
+        # Brand-based news (client + competitors)
+        brands = []
+        if self.client_name:
+            brands.append({'name': self.client_name, 'label': 'client_brand'})
+        for comp in self.competitors[:3]:
+            if comp.get('name'):
+                brands.append({'name': comp['name'], 'label': 'competitor'})
+
+        for brand in brands:
+            brand_key = f"brand_{brand['name'].lower().replace(' ', '_')}"
+            articles = self._fetch_news(brand['name'])
+            results[brand_key] = {
+                'query': brand['name'],
+                'label': brand['label'],
+                'articles': articles,
+                'article_count': len(articles),
+                'is_brand': True
+            }
+
         return results
 
     def _fetch_news(self, query: str, label: str = "keyword") -> Dict[str, Any]:
