@@ -343,8 +343,8 @@ def run_scheduled_reports():
         queries = Query.query.filter_by(auto_run=True).all()
         for query in queries:
             # Get the most recent report for this query
-            last_report = (Report.query
-                           .filter_by(query_id=query.id)
+            last_report = (db.session.query(Report)
+                           .filter(Report.query_id == query.id)
                            .order_by(Report.created_at.desc())
                            .first())
 
