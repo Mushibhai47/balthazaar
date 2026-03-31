@@ -567,6 +567,12 @@ def edit_summary(report_id):
     return redirect(url_for("view_report", report_id=report_id))
 
 
+# --- Glossary / How It Works ---
+@app.route("/glossary")
+def glossary():
+    return render_template("glossary.html")
+
+
 # --- SMTP Settings ---
 @app.route("/settings/smtp", methods=["POST"])
 def save_smtp():

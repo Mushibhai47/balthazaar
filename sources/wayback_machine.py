@@ -89,12 +89,31 @@ class WaybackMachineCollector(BaseKeywordCollector):
                         date_str = datetime.strptime(ts[:8], '%Y%m%d').strftime('%b %d, %Y')
                     except Exception:
                         date_str = ts[:8]
-                    snapshots.append({
+                    change = {
                         'date': date_str,
                         'timestamp': ts,
                         'page': page_url[:80],
                         'archive_url': f"https://web.archive.org/web/{ts}/{url}"
-                    })
+                    }
+                    # Generate a human-readable description
+                    page_url_lower = page_url.lower()
+                    if 'pricing' in page_url_lower:
+                        change['description'] = 'Pricing page updated'
+                    elif 'product' in page_url_lower:
+                        change['description'] = 'Product page modified'
+                    elif 'about' in page_url_lower:
+                        change['description'] = 'About page updated'
+                    elif 'contact' in page_url_lower:
+                        change['description'] = 'Contact information updated'
+                    elif 'blog' in page_url_lower or 'news' in page_url_lower:
+                        change['description'] = 'New blog/news content added'
+                    elif 'career' in page_url_lower or 'job' in page_url_lower:
+                        change['description'] = 'Careers/jobs page updated'
+                    elif page_url == '/' or page_url == '':
+                        change['description'] = 'Homepage content changed'
+                    else:
+                        change['description'] = f'Page content updated'
+                    snapshots.append(change)
 
             return {
                 'snapshots': len(snapshots),

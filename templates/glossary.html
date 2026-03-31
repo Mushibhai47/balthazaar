@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}How It Works — Methodology{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto animate-in">
+    <a href="/" class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-brand transition mb-6">
+        <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+        Back to Dashboard
+    </a>
+
+    <div class="glass-card rounded-2xl border border-gray-100 p-8 mb-6">
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">How It Works</h1>
+        <p class="text-gray-400 text-sm">Methodology & data sources for Balthazaar Intelligence Reports</p>
+    </div>
+
+    {% set sections = [
+        {
+            'icon': 'psychology',
+            'color': 'text-brand',
+            'title': 'ChatGPT Overall Market Score',
+            'source': 'Powered by OpenAI GPT-4o',
+            'desc': 'A score from 0–100 reflecting the overall competitive strength of a brand. Calculated by GPT-4o after analysing keyword trends, search volume, competition levels, CPC data, news sentiment, and competitor activity. A higher score indicates stronger market presence and opportunity. Scores are generated for the client and each selected competitor independently.',
+            'fields': ['0–40: Weak market presence', '41–65: Moderate, room to grow', '66–80: Strong competitive position', '81–100: Market leader']
+        },
+        {
+            'icon': 'search',
+            'color': 'text-indigo-500',
+            'title': 'Keyword Volume & Trends',
+            'source': 'OpenAI / Google Gemini',
+            'desc': 'Monthly search volume estimates for each tracked keyword. Trend direction (↑ rising / — stable / ↓ declining) reflects whether search interest is increasing or decreasing. CPC (Cost Per Click) shows the estimated advertising cost for that keyword.',
+            'fields': ['Volume: estimated monthly searches', 'Avg. Volume: 6-month average', 'CPC: estimated Google Ads cost per click', 'Competition: LOW / MEDIUM / HIGH']
+        },
+        {
+            'icon': 'bar_chart',
+            'color': 'text-indigo-600',
+            'title': 'Website Traffic',
+            'source': 'Ubersuggest',
+            'desc': 'Estimated monthly website visits pulled from Ubersuggest for the client and each competitor. Split into organic (SEO-driven) and paid (advertising-driven) traffic.',
+            'fields': ['Organic: visits from search engines (unpaid)', 'Paid: visits from paid advertising', 'Domain Score: overall domain authority (0–100)']
+        },
+        {
+            'icon': 'play_circle',
+            'color': 'text-red-500',
+            'title': 'YouTube Performance',
+            'source': 'YouTube Data API',
+            'desc': 'Video performance data fetched via the official YouTube API. Shows how content related to tracked keywords is performing — total videos, average views, engagement rates, and which channels dominate each topic.',
+            'fields': ['Avg Views: average views per video', 'Engagement Rate: (likes + comments) / views × 100', 'Competition: how saturated the keyword is on YouTube']
+        },
+        {
+            'icon': 'sentiment_satisfied',
+            'color': 'text-purple-500',
+            'title': 'Online Sentiment',
+            'source': 'Google News + VADER NLP',
+            'desc': 'Sentiment analysis of online content mentioning the brand or keywords. Uses VADER (Valence Aware Dictionary and sEntiment Reasoner), a proven NLP model, to score each piece of content as Positive, Neutral, or Negative. Brand sentiment searches specifically for the client and competitor brand names.',
+            'fields': ['Positive: favourable mentions', 'Neutral: factual/balanced mentions', 'Negative: critical or unfavourable mentions', 'Score range: -1.0 (most negative) to +1.0 (most positive)']
+        },
+        {
+            'icon': 'newspaper',
+            'color': 'text-blue-500',
+            'title': 'Brand Monitoring & News',
+            'source': 'Google News RSS',
+            'desc': 'Latest news articles mentioning the brand name or competitor names, fetched from Google News. Articles are sorted by recency. Provides real-time visibility into press coverage, announcements, and media mentions.',
+            'fields': ['Brand search: searches by exact brand/company name', 'Top 5 articles shown per brand', 'Source, date, and direct link provided']
+        },
+        {
+            'icon': 'history',
+            'color': 'text-amber-500',
+            'title': 'Website Amendments',
+            'source': 'Internet Archive',
+            'desc': 'Detects changes to competitor websites by comparing historical snapshots. Identifies when pages were updated, added, or restructured — giving insight into product launches, pricing changes, and strategic shifts.',
+            'fields': ['Snapshot comparison over 30-day window', 'Page-level change detection', 'Direct link to historical version for comparison']
+        },
+        {
+            'icon': 'work',
+            'color': 'text-blue-700',
+            'title': 'Recruitment Intelligence',
+            'source': 'LinkedIn Jobs',
+            'desc': 'Tracks job postings from competitors on LinkedIn. Hiring patterns reveal strategic direction — a competitor hiring data scientists signals AI investment; hiring sales staff signals market expansion.',
+            'fields': ['Role title and location', 'Date posted', 'Link to full job listing']
+        },
+        {
+            'icon': 'campaign',
+            'color': 'text-blue-600',
+            'title': 'Adverts — Meta & Google',
+            'source': 'Meta Ad Library API / Google Ads API',
+            'desc': 'Active advertising campaigns run by the brand and competitors. Meta Ad Library is publicly accessible. Google Ads data requires API access (pending approval). Shows what messaging and offers competitors are actively promoting.',
+            'fields': ['Advertiser name', 'Campaign start date', 'Estimated impressions', 'Link to view the ad creative']
+        }
+    ] %}
+
+    <div class="space-y-4">
+        {% for s in sections %}
+        <div class="glass-card rounded-2xl border border-gray-100 p-6">
+            <div class="flex items-start gap-4">
+                <div class="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined {{ s.color }} text-[22px]">{{ s.icon }}</span>
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center justify-between flex-wrap gap-2 mb-1">
+                        <h2 class="text-base font-semibold text-gray-900">{{ s.title }}</h2>
+                        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">{{ s.source }}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 leading-relaxed mb-3">{{ s.desc }}</p>
+                    <ul class="space-y-1">
+                        {% for f in s.fields %}
+                        <li class="text-xs text-gray-500 flex items-start gap-2">
+                            <span class="text-brand mt-0.5">›</span> {{ f }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
