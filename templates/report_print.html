@@ -211,12 +211,17 @@
     {% if news_data %}
     <div class="section">
         <div class="section-title">Brand Monitoring & News</div>
-        {% for kw in keywords %}
-        {% set articles_raw = news_data.get(kw, []) %}
-        {% set articles = articles_raw.values() | list if articles_raw is mapping else articles_raw | list %}
+        {% for key, nd in news_data.items() %}
+        {% if nd is mapping %}
+            {% set articles = nd.get('articles', []) %}
+            {% set label = nd.get('query', key) %}
+        {% else %}
+            {% set articles = nd | list %}
+            {% set label = key %}
+        {% endif %}
         {% if articles %}
         <div style="margin-bottom:14px">
-            <div style="font-size:11px;font-weight:700;color:#6B51F0;margin-bottom:6px">{{ kw }}</div>
+            <div style="font-size:11px;font-weight:700;color:#6B51F0;margin-bottom:6px">{{ label }}</div>
             <ul class="news-list">
                 {% for a in articles[:4] %}
                 <li>
@@ -224,7 +229,7 @@
                     <div>
                         {% if a is mapping %}
                         <div style="font-weight:600;color:#1a1a2e">{{ (a.get('title', '') or '')[:90] }}</div>
-                        <div class="news-source">{{ a.get('source', '') }} · {{ a.get('published', '') }}</div>
+                        <div class="news-source">{{ a.get('source', '') }} · {{ a.get('published', '')[:16] }}</div>
                         {% else %}
                         <div style="font-weight:600;color:#1a1a2e">{{ (a | string)[:90] }}</div>
                         {% endif %}
