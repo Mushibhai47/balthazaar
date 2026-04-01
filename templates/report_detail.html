@@ -60,13 +60,33 @@
         {% set failed = metadata.get('sources_failed', []) %}
         {% set errors = metadata.get('errors', {}) %}
         {% set source_labels = {
-            'openai': 'OpenAI', 'google_gemini': 'Gemini', 'youtube': 'YouTube',
+            'openai': 'ChatGPT', 'google_gemini': 'Gemini', 'youtube': 'YouTube',
             'tiktok': 'TikTok', 'instagram': 'Instagram', 'ubersuggest': 'Ubersuggest',
             'google_ads': 'Google Ads', 'ads_tracker': 'Meta Ads',
-            'sentiment': 'Sentiment', 'google_news': 'Google News',
-            'wayback_machine': 'Web Amendments', 'linkedin_jobs': 'LinkedIn Jobs',
-            'ai_insights': 'AI Summary'
+            'sentiment': 'Sentiment', 'google_news': 'News', 'website_traffic': 'Traffic',
+            'ai_visibility': 'AI Visibility', 'wayback_machine': 'Web Changes',
+            'linkedin_jobs': 'Jobs', 'ai_insights': 'AI Summary'
         } %}
+
+        {% if succeeded or failed %}
+        <div class="mt-4 pt-4 border-t border-gray-100 no-print">
+            <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-2">Data Sources</p>
+            <div class="flex flex-wrap gap-1.5">
+                {% for s in succeeded %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                    {{ source_labels.get(s, s) }}
+                </span>
+                {% endfor %}
+                {% for s in failed %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-600 border border-red-100" title="{{ errors.get(s, '') }}">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-400 inline-block"></span>
+                    {{ source_labels.get(s, s) }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
     </div>
 
