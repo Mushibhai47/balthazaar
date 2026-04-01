@@ -49,12 +49,12 @@ class GoogleNewsCollector(BaseKeywordCollector):
 
         for brand in brands:
             brand_key = f"brand_{brand['name'].lower().replace(' ', '_')}"
-            articles = self._fetch_news(brand['name'])
+            fetched = self._fetch_news(brand['name'])
             results[brand_key] = {
                 'query': brand['name'],
                 'label': brand['label'],
-                'articles': articles,
-                'article_count': len(articles),
+                'articles': fetched.get('articles', []),
+                'article_count': fetched.get('article_count', 0),
                 'is_brand': True
             }
 
