@@ -246,29 +246,37 @@
     {% if news_data %}
     <div class="section">
         <div class="section-title">Brand Monitoring & News</div>
+        {# Brand items first (client + competitors by name) #}
+        {% set seen_labels = [] %}
         {% for key, nd in news_data.items() %}
-        {% if nd is mapping %}
-            {% set articles = nd.get('articles', []) %}
-            {% set label = nd.get('query', key) %}
-        {% else %}
-            {% set articles = nd | list %}
-            {% set label = key %}
-        {% endif %}
-        {% if articles %}
+        {% if nd is mapping and nd.get('articles') and (nd.get('is_brand') or nd.get('label') in ['client_brand', 'competitor']) %}
+        {% set label = nd.get('query', key) %}
+        {% if label not in seen_labels %}{% set _ = seen_labels.append(label) %}
         <div style="margin-bottom:14px">
-            <div style="font-size:11px;font-weight:700;color:#6B51F0;margin-bottom:6px">{{ label }}</div>
+            <div style="font-size:11px;font-weight:700;color:#6B51F0;margin-bottom:6px">{{ label }} <span style="font-weight:400;color:#94a3b8;font-size:9px">{{ nd.get('article_count', 0) }} articles</span></div>
             <ul class="news-list">
-                {% for a in articles[:4] %}
+                {% for a in nd.get('articles', [])[:4] %}
                 <li>
                     <div class="news-dot"></div>
-                    <div>
-                        {% if a is mapping %}
-                        <div style="font-weight:600;color:#1a1a2e">{{ (a.get('title', '') or '')[:90] }}</div>
-                        <div class="news-source">{{ a.get('source', '') }} · {{ a.get('published', '')[:16] }}</div>
-                        {% else %}
-                        <div style="font-weight:600;color:#1a1a2e">{{ (a | string)[:90] }}</div>
-                        {% endif %}
-                    </div>
+                    <div><div style="font-weight:600;color:#1a1a2e">{{ (a.get('title', '') or '')[:90] }}</div>
+                    <div class="news-source">{{ a.get('source', '') }}{% if a.get('published') %} · {{ a.get('published', '')[:16] }}{% endif %}</div></div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}{% endif %}
+        {% endfor %}
+        {# Keyword-based news #}
+        {% for key, nd in news_data.items() %}
+        {% if nd is mapping and nd.get('articles') and nd.get('label') == 'keyword' %}
+        <div style="margin-bottom:14px">
+            <div style="font-size:10px;font-weight:700;color:#374151;margin-bottom:5px">{{ nd.get('query', key) }}</div>
+            <ul class="news-list">
+                {% for a in nd.get('articles', [])[:3] %}
+                <li>
+                    <div class="news-dot" style="background:#94a3b8"></div>
+                    <div><div style="font-weight:600;color:#374151">{{ (a.get('title', '') or '')[:90] }}</div>
+                    <div class="news-source">{{ a.get('source', '') }}{% if a.get('published') %} · {{ a.get('published', '')[:16] }}{% endif %}</div></div>
                 </li>
                 {% endfor %}
             </ul>
@@ -282,27 +290,36 @@
     {% set jobs_data = kw_data.get('linkedin_jobs', {}) %}
     {% if jobs_data %}
     <div class="section">
-        <div class="section-title">Competitor Recruitment Activity</div>
-        {% for company, jobs_raw in jobs_data.items() %}
-        {% set jobs = jobs_raw.values() | list if jobs_raw is mapping else jobs_raw | list %}
-        {% if jobs %}
+        <div class="section-title">Recruitment Activity</div>
+        {% for key, entry in jobs_data.items() %}
+        {% if entry is mapping and not entry.get('message') %}
+        {% set display_name = entry.get('name', key.replace('_competitor_','').replace('_client','client')) %}
+        {% set jobs = entry.get('recent_jobs', []) %}
+        {% if display_name and display_name != '_info' %}
         <div style="margin-bottom:12px">
-            <div style="font-size:11px;font-weight:700;color:#1a1a2e;margin-bottom:6px">{{ company }}</div>
+            <div style="font-size:11px;font-weight:700;color:#1a1a2e;margin-bottom:2px">
+                {{ display_name }}
+                <span style="font-weight:400;color:#94a3b8;font-size:9px">({{ entry.get('jobs_found', 0) }} open roles)</span>
+            </div>
+            {% if jobs %}
             <table>
                 <tbody>
-                    {% for job in jobs[:4] %}
+                    {% for job in jobs[:5] %}
                     <tr>
-                        {% if job is mapping %}
                         <td style="font-weight:600">{{ job.get('title', '') }}</td>
-                        <td style="color:#64748b">{{ job.get('location', '') }}</td>
-                        <td style="color:#94a3b8;font-family:monospace;font-size:10px">{{ job.get('posted_date', '') }}</td>
-                        {% else %}
-                        <td style="font-weight:600">{{ job | string }}</td>
-                        {% endif %}
+                        <td style="color:#64748b;width:140px">{{ job.get('location', '') }}</td>
+                        <td style="color:#94a3b8;font-size:10px;width:90px">{{ job.get('posted', job.get('posted_date', '')) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            {% else %}
+            <p style="font-size:10px;color:#94a3b8">No recent open roles found.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endif %}
+        {% endfor %}
         </div>
         {% endif %}
         {% endfor %}
@@ -314,11 +331,26 @@
     {% if wayback_data %}
     <div class="section">
         <div class="section-title">Website Change Monitoring (Last 30 Days)</div>
-        {% for url, wdata in wayback_data.items() %}
-        <div style="margin-bottom:10px;padding:10px;background:#F8F7FF;border-radius:8px;border:1px solid #EDE9FE">
-            <div style="font-weight:600;font-size:11px;margin-bottom:4px">{{ url }}</div>
-            <div style="color:#64748b">{{ wdata.get('changes_detected', 0) }} changes detected</div>
+        {% for key, wdata in wayback_data.items() %}
+        {% if wdata is mapping and not wdata.get('message') %}
+        {% set display_name = wdata.get('label', key.replace('_competitor_','').replace('_client', client.name)) %}
+        <div style="margin-bottom:10px;padding:12px;background:#F8F7FF;border-radius:8px;border:1px solid #EDE9FE">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <div style="font-weight:700;font-size:11px;color:#1a1a2e">{{ display_name }}</div>
+                <div style="font-size:10px;font-weight:700;
+                    {% if wdata.get('changes_detected', 0) > 0 %}color:#d97706{% else %}color:#94a3b8{% endif %}">
+                    {{ wdata.get('changes_detected', 0) }} change{{ 's' if wdata.get('changes_detected', 0) != 1 else '' }} detected
+                </div>
+            </div>
+            {% if wdata.get('url') %}<div style="font-size:9px;color:#94a3b8">{{ wdata.get('url', '') }}</div>{% endif %}
+            {% for change in wdata.get('changes', [])[:3] %}
+            <div style="margin-top:5px;font-size:10px;color:#374151;border-top:1px solid #EDE9FE;padding-top:4px">
+                <span style="color:#d97706;font-weight:600">{{ change.get('date', '') }}</span>
+                — {{ change.get('description', 'Page content updated') }}
+            </div>
+            {% endfor %}
         </div>
+        {% endif %}
         {% endfor %}
     </div>
     {% endif %}
