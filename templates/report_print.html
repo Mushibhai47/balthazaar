@@ -6,44 +6,65 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: #1a1a2e; background: white; }
-        .print-btn { position: fixed; top: 20px; right: 20px; background: #6B51F0; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
-        @media print { .print-btn { display: none; } body { padding: 0; } }
+        .print-btn { position: fixed; top: 20px; right: 20px; background: #6B51F0; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; z-index: 100; box-shadow: 0 2px 8px rgba(107,81,240,0.3); }
+        @media print {
+            .print-btn { display: none; }
+            body { padding: 0; }
+            .section { page-break-inside: avoid; }
+            .page-break { page-break-before: always; }
+        }
 
-        .page { max-width: 900px; margin: 0 auto; padding: 40px; }
-        .header { border-bottom: 3px solid #6B51F0; padding-bottom: 20px; margin-bottom: 28px; }
-        .header h1 { font-size: 22px; font-weight: 700; color: #1a1a2e; }
-        .header .meta { color: #64748b; font-size: 11px; margin-top: 6px; }
-        .header .brand { font-size: 11px; color: #6B51F0; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 6px; }
+        .page { max-width: 860px; margin: 0 auto; padding: 48px 40px; }
 
+        /* Header */
+        .header { background: linear-gradient(135deg, #6B51F0 0%, #9B6BF0 100%); color: white; border-radius: 14px; padding: 28px 32px; margin-bottom: 28px; }
+        .header .brand-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.75; margin-bottom: 8px; }
+        .header h1 { font-size: 24px; font-weight: 700; color: white; margin-bottom: 8px; line-height: 1.2; }
+        .header .meta { color: rgba(255,255,255,0.75); font-size: 11px; line-height: 1.6; }
+        .header .competitors { margin-top: 8px; font-size: 10px; color: rgba(255,255,255,0.65); }
+
+        /* Stats */
         .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
         .stat-box { background: #F8F7FF; border-radius: 10px; padding: 14px; text-align: center; border: 1px solid #EDE9FE; }
-        .stat-box .num { font-size: 24px; font-weight: 700; color: #6B51F0; }
-        .stat-box .label { font-size: 10px; color: #94a3b8; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-box .num { font-size: 22px; font-weight: 700; color: #6B51F0; }
+        .stat-box .label { font-size: 9px; color: #94a3b8; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.06em; }
 
-        .section { margin-bottom: 28px; page-break-inside: avoid; }
-        .section-title { font-size: 13px; font-weight: 700; color: #1a1a2e; border-left: 4px solid #6B51F0; padding-left: 10px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+        /* Sections */
+        .section { margin-bottom: 28px; }
+        .section-title { font-size: 12px; font-weight: 700; color: #6B51F0; border-left: 3px solid #6B51F0; padding-left: 10px; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.06em; }
 
+        /* Tables */
         table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        thead th { background: #F8F7FF; text-align: left; padding: 8px 10px; font-size: 9px; font-weight: 700; color: #6B51F0; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid #EDE9FE; }
-        tbody td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #374151; }
+        thead th { background: #F8F7FF; text-align: left; padding: 8px 10px; font-size: 9px; font-weight: 700; color: #6B51F0; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 2px solid #EDE9FE; }
+        tbody td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; color: #374151; vertical-align: top; }
         tbody tr:last-child td { border-bottom: none; }
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; }
+        tbody tr:hover td { background: #FAFAF8; }
+
+        /* Badges */
+        .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 700; }
         .badge-red { background: #fef2f2; color: #dc2626; }
         .badge-amber { background: #fffbeb; color: #d97706; }
         .badge-green { background: #f0fdf4; color: #16a34a; }
         .badge-purple { background: #f5f3ff; color: #7c3aed; }
         .badge-blue { background: #eff6ff; color: #2563eb; }
-        .trend-up { color: #16a34a; font-weight: 700; }
-        .trend-down { color: #dc2626; font-weight: 700; }
-        .trend-stable { color: #94a3b8; }
+        .trend-up { color: #16a34a; font-weight: 700; font-size: 13px; }
+        .trend-down { color: #dc2626; font-weight: 700; font-size: 13px; }
+        .trend-stable { color: #94a3b8; font-size: 13px; }
 
+        /* News */
         .news-list { list-style: none; }
         .news-list li { padding: 6px 0; border-bottom: 1px solid #f1f5f9; display: flex; gap: 10px; align-items: flex-start; }
         .news-list li:last-child { border-bottom: none; }
         .news-dot { width: 6px; height: 6px; border-radius: 50%; background: #6B51F0; flex-shrink: 0; margin-top: 4px; }
         .news-source { font-size: 9px; color: #94a3b8; margin-top: 2px; }
 
-        .footer { border-top: 1px solid #e2e8f0; padding-top: 14px; margin-top: 28px; text-align: center; font-size: 10px; color: #94a3b8; }
+        /* Executive Summary block */
+        .exec-block { background: #F8F7FF; border-radius: 12px; padding: 20px; border: 1px solid #EDE9FE; margin-bottom: 28px; }
+        .exec-score { float: right; text-align: center; background: #6B51F0; color: white; border-radius: 10px; padding: 10px 16px; }
+        .exec-score .num { font-size: 22px; font-weight: 700; }
+        .exec-score .lbl { font-size: 8px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        .footer { border-top: 1px solid #e2e8f0; padding-top: 14px; margin-top: 32px; display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8; }
     </style>
 </head>
 <body>
@@ -52,18 +73,15 @@
 <div class="page">
     <!-- Header -->
     <div class="header">
-        <div class="brand">Balthazaar Intelligence</div>
-        <h1>{{ client.name }} — Competitive Intelligence Report</h1>
+        <div class="brand-tag">Balthazaar Intelligence</div>
+        <h1>{{ client.name }}</h1>
         <div class="meta">
-            Report #{{ report.id }} &nbsp;·&nbsp;
+            Competitive Intelligence Report &nbsp;·&nbsp; Report #{{ report.id }}<br>
             {% if report.generated_at %}{{ report.generated_at.strftime('%B %d, %Y') }}{% else %}{{ report.created_at.strftime('%B %d, %Y') }}{% endif %}
-            &nbsp;·&nbsp; {{ keywords|length }} Keywords
-            &nbsp;·&nbsp; {{ query.get_countries()|join(', ') }}
+            &nbsp;·&nbsp; {{ keywords|length }} Keywords &nbsp;·&nbsp; {{ query.get_countries()|join(', ') }}
         </div>
         {% if competitors %}
-        <div class="meta" style="margin-top:4px">
-            Competitors: {{ competitors | map(attribute='name') | join(', ') }}
-        </div>
+        <div class="competitors">Competitors tracked: {{ competitors | map(attribute='name') | join(' · ') }}</div>
         {% endif %}
     </div>
 
@@ -71,23 +89,45 @@
     {% set kw_data_pre = data.get('keywords', {}) %}
     {% set insights = kw_data_pre.get('ai_insights', {}) %}
     {% if insights and insights.get('executive_summary') %}
-    <div class="section" style="background:#f5f3ff;border-radius:12px;padding:18px;border:1px solid #EDE9FE;margin-bottom:28px">
-        <div class="section-title" style="border-left-color:#6B51F0">Executive Summary</div>
-        <p style="color:#374151;font-size:12px;line-height:1.7;margin-bottom:14px">{{ insights.executive_summary }}</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="exec-block">
+        {% if insights.get('overall_score') %}
+        <div class="exec-score">
+            <div class="num">{{ insights.overall_score }}</div>
+            <div class="lbl">Market Score</div>
+        </div>
+        {% endif %}
+        <div class="section-title">Executive Summary</div>
+        <p style="color:#374151;font-size:12px;line-height:1.7;margin-bottom:14px;clear:none">{{ insights.executive_summary }}</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;clear:both;padding-top:4px">
             {% if insights.get('top_opportunities') %}
             <div>
-                <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Top Opportunities</div>
-                {% for opp in insights.top_opportunities[:2] %}
-                <div style="margin-bottom:5px"><span style="font-weight:700;font-size:11px">{{ opp.title }}</span><br><span style="color:#64748b;font-size:10px">{{ opp.description[:100] }}</span></div>
+                <div style="font-size:9px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Opportunities</div>
+                {% for opp in insights.top_opportunities[:3] %}
+                <div style="margin-bottom:6px;padding:6px 8px;background:white;border-radius:6px;border:1px solid #d1fae5">
+                    <div style="font-weight:700;font-size:10px;color:#1a1a2e">{{ opp.title }}</div>
+                    <div style="color:#64748b;font-size:9px;margin-top:2px">{{ (opp.description or '')[:80] }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if insights.get('top_threats') %}
+            <div>
+                <div style="font-size:9px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Threats</div>
+                {% for t in insights.top_threats[:3] %}
+                <div style="margin-bottom:6px;padding:6px 8px;background:white;border-radius:6px;border:1px solid #fee2e2">
+                    <div style="font-weight:700;font-size:10px;color:#1a1a2e">{{ t.title }}</div>
+                    <div style="color:#64748b;font-size:9px;margin-top:2px">{{ (t.description or '')[:80] }}</div>
+                </div>
                 {% endfor %}
             </div>
             {% endif %}
             {% if insights.get('recommended_actions') %}
             <div>
-                <div style="font-size:10px;font-weight:700;color:#6B51F0;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Recommended Actions</div>
+                <div style="font-size:9px;font-weight:700;color:#6B51F0;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Actions</div>
                 {% for action in insights.recommended_actions[:4] %}
-                <div style="margin-bottom:4px;font-size:10px;color:#374151">→ {{ action }}</div>
+                <div style="margin-bottom:5px;font-size:10px;color:#374151;padding-left:10px;position:relative">
+                    <span style="position:absolute;left:0;color:#6B51F0;font-weight:700">→</span>{{ action }}
+                </div>
                 {% endfor %}
             </div>
             {% endif %}
@@ -133,7 +173,6 @@
                     <th style="text-align:right">Volume</th>
                     <th>Competition</th>
                     <th style="text-align:right">CPC</th>
-                    <th>Intent</th>
                     <th>Trend</th>
                     <th>Insight</th>
                 </tr>
@@ -151,16 +190,12 @@
                         {% else %}—{% endif %}
                     </td>
                     <td style="text-align:right;font-family:monospace">{% if kd.get('estimated_cpc', 0) > 0 %}${{ '%.2f'|format(kd.get('estimated_cpc', 0)) }}{% else %}—{% endif %}</td>
-                    <td>{% set i = kd.get('intent', '') %}
-                        {% if i %}<span class="badge {% if i == 'commercial' %}badge-purple{% elif i == 'transactional' %}badge-blue{% else %}badge-amber{% endif %}">{{ i|capitalize }}</span>{% else %}—{% endif %}
-                    </td>
                     <td>{% set t = kd.get('trend', '') %}
-                        {% if t == 'rising' %}<span class="trend-up">↑ Rising</span>
-                        {% elif t == 'declining' %}<span class="trend-down">↓ Declining</span>
-                        {% elif t == 'stable' %}<span class="trend-stable">→ Stable</span>
-                        {% else %}—{% endif %}
+                        {% if t == 'rising' %}<span class="trend-up">↑</span>
+                        {% elif t == 'declining' %}<span class="trend-down">↓</span>
+                        {% else %}<span class="trend-stable">—</span>{% endif %}
                     </td>
-                    <td style="max-width:200px;color:#64748b">{{ (kd.get('insight', '') or '')[:90] }}</td>
+                    <td style="max-width:220px;color:#64748b">{{ (kd.get('insight', '') or '')[:100] }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -211,12 +246,17 @@
     {% if news_data %}
     <div class="section">
         <div class="section-title">Brand Monitoring & News</div>
-        {% for kw in keywords %}
-        {% set articles_raw = news_data.get(kw, []) %}
-        {% set articles = articles_raw.values() | list if articles_raw is mapping else articles_raw | list %}
+        {% for key, nd in news_data.items() %}
+        {% if nd is mapping %}
+            {% set articles = nd.get('articles', []) %}
+            {% set label = nd.get('query', key) %}
+        {% else %}
+            {% set articles = nd | list %}
+            {% set label = key %}
+        {% endif %}
         {% if articles %}
         <div style="margin-bottom:14px">
-            <div style="font-size:11px;font-weight:700;color:#6B51F0;margin-bottom:6px">{{ kw }}</div>
+            <div style="font-size:11px;font-weight:700;color:#6B51F0;margin-bottom:6px">{{ label }}</div>
             <ul class="news-list">
                 {% for a in articles[:4] %}
                 <li>
@@ -224,7 +264,7 @@
                     <div>
                         {% if a is mapping %}
                         <div style="font-weight:600;color:#1a1a2e">{{ (a.get('title', '') or '')[:90] }}</div>
-                        <div class="news-source">{{ a.get('source', '') }} · {{ a.get('published', '') }}</div>
+                        <div class="news-source">{{ a.get('source', '') }} · {{ a.get('published', '')[:16] }}</div>
                         {% else %}
                         <div style="font-weight:600;color:#1a1a2e">{{ (a | string)[:90] }}</div>
                         {% endif %}
@@ -284,7 +324,9 @@
     {% endif %}
 
     <div class="footer">
-        Confidential — Generated by Balthazaar Intelligence Platform · {{ client.name }} · Report #{{ report.id }}
+        <span>Confidential — {{ client.name }} · Report #{{ report.id }}</span>
+        <span>Generated by Balthazaar Intelligence Platform</span>
+        <span>{% if report.generated_at %}{{ report.generated_at.strftime('%B %d, %Y') }}{% else %}{{ report.created_at.strftime('%B %d, %Y') }}{% endif %}</span>
     </div>
 </div>
 

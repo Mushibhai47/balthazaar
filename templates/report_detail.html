@@ -60,13 +60,33 @@
         {% set failed = metadata.get('sources_failed', []) %}
         {% set errors = metadata.get('errors', {}) %}
         {% set source_labels = {
-            'openai': 'OpenAI', 'google_gemini': 'Gemini', 'youtube': 'YouTube',
+            'openai': 'ChatGPT', 'google_gemini': 'Gemini', 'youtube': 'YouTube',
             'tiktok': 'TikTok', 'instagram': 'Instagram', 'ubersuggest': 'Ubersuggest',
             'google_ads': 'Google Ads', 'ads_tracker': 'Meta Ads',
-            'sentiment': 'Sentiment', 'google_news': 'Google News',
-            'wayback_machine': 'Web Amendments', 'linkedin_jobs': 'LinkedIn Jobs',
-            'ai_insights': 'AI Summary'
+            'sentiment': 'Sentiment', 'google_news': 'News', 'website_traffic': 'Traffic',
+            'ai_visibility': 'AI Visibility', 'wayback_machine': 'Web Changes',
+            'linkedin_jobs': 'Jobs', 'ai_insights': 'AI Summary'
         } %}
+
+        {% if succeeded or failed %}
+        <div class="mt-4 pt-4 border-t border-gray-100 no-print">
+            <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-2">Data Sources</p>
+            <div class="flex flex-wrap gap-1.5">
+                {% for s in succeeded %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                    {{ source_labels.get(s, s) }}
+                </span>
+                {% endfor %}
+                {% for s in failed %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-600 border border-red-100" title="{{ errors.get(s, '') }}">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-400 inline-block"></span>
+                    {{ source_labels.get(s, s) }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
     </div>
 
@@ -207,7 +227,7 @@
         </div>
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-emerald-500 text-[28px] mb-1">database</span>
-            <p class="text-2xl font-bold text-gray-900">{{ succeeded|length }}<span class="text-sm text-gray-400 font-normal">/13</span></p>
+            <p class="text-2xl font-bold text-gray-900">{{ succeeded|length }}<span class="text-sm text-gray-400 font-normal">/15</span></p>
             <p class="text-xs text-gray-400">Sources</p>
         </div>
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
@@ -663,8 +683,8 @@
                     <p class="text-[10px] font-semibold text-emerald-600 mb-1">Top Positive</p>
                     {% for c in sd.get('top_positive', [])[:3] %}
                     <div class="bg-emerald-50/50 rounded p-1.5 mb-1 text-[11px] text-gray-600">
-                        "{{ (c.get('text', '') or c.get('title', ''))[:100] }}"
-                        {% if c.get('link') %}<a href="{{ c.link }}" target="_blank" class="text-brand ml-1">↗</a>{% endif %}
+                        "{{ ((c.get('text', '') or c.get('title', '')) | striptags)[:100] }}"
+                        {% if c.get('url') %}<a href="{{ c.url }}" target="_blank" class="text-brand ml-1">↗</a>{% elif c.get('link') and c.get('link').startswith('http') %}<a href="{{ c.link }}" target="_blank" class="text-brand ml-1">↗</a>{% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -674,8 +694,8 @@
                     <p class="text-[10px] font-semibold text-red-500 mb-1">Top Negative</p>
                     {% for c in sd.get('top_negative', [])[:3] %}
                     <div class="bg-red-50/50 rounded p-1.5 mb-1 text-[11px] text-gray-600">
-                        "{{ (c.get('text', '') or c.get('title', ''))[:100] }}"
-                        {% if c.get('link') %}<a href="{{ c.link }}" target="_blank" class="text-brand ml-1">↗</a>{% endif %}
+                        "{{ ((c.get('text', '') or c.get('title', '')) | striptags)[:100] }}"
+                        {% if c.get('url') %}<a href="{{ c.url }}" target="_blank" class="text-brand ml-1">↗</a>{% elif c.get('link') and c.get('link').startswith('http') %}<a href="{{ c.link }}" target="_blank" class="text-brand ml-1">↗</a>{% endif %}
                     </div>
                     {% endfor %}
                 </div>
