@@ -58,6 +58,14 @@
                 </div>
             </div>
 
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Report Recipients <span class="text-gray-400 font-normal text-xs">(in addition to primary contact)</span></label>
+                <textarea name="report_recipients" rows="3"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition resize-none"
+                    placeholder="colleague@company.com&#10;manager@company.com">{{ client.get_report_recipients() | join('\n') }}</textarea>
+                <p class="text-xs text-gray-400 mt-1">One per line or comma-separated. All will receive report emails.</p>
+            </div>
+
             <div class="flex gap-4">
                 <button type="submit"
                     class="flex items-center gap-2 stat-gradient-1 hover:opacity-90 text-white font-semibold px-8 py-3 rounded-xl transition shadow-lg shadow-brand-200/30">

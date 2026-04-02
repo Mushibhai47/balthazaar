@@ -110,13 +110,13 @@
                 {% endfor %}
             </div>
             {% endif %}
-            {% if insights.get('top_threats') %}
+            {% if insights.get('competitive_threats') %}
             <div>
                 <div style="font-size:9px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Threats</div>
-                {% for t in insights.top_threats[:3] %}
+                {% for t in insights.competitive_threats[:3] %}
                 <div style="margin-bottom:6px;padding:6px 8px;background:white;border-radius:6px;border:1px solid #fee2e2">
-                    <div style="font-weight:700;font-size:10px;color:#1a1a2e">{{ t.title }}</div>
-                    <div style="color:#64748b;font-size:9px;margin-top:2px">{{ (t.description or '')[:80] }}</div>
+                    <div style="font-weight:700;font-size:10px;color:#1a1a2e">{{ t.get('competitor', t.get('title','')) }}</div>
+                    <div style="color:#64748b;font-size:9px;margin-top:2px">{{ (t.get('threat', t.get('description','')) or '')[:80] }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -161,6 +161,40 @@
             <div class="label">Avg CPC</div>
         </div>
     </div>
+
+    <!-- Website Traffic -->
+    {% set traffic_data = kw_data.get('website_traffic', {}) %}
+    {% if traffic_data %}
+    <div class="section">
+        <div class="section-title">Website Traffic</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Website</th>
+                    <th style="text-align:right">Organic For Period</th>
+                    <th style="text-align:right">Paid For Period</th>
+                    <th style="text-align:right">Total For Period</th>
+                    <th style="text-align:right">Domain Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for key, td in traffic_data.items() %}
+                {% if not td.get('error') and td is mapping %}
+                <tr>
+                    <td style="font-weight:600">{{ td.get('label', td.get('domain', key)) }}</td>
+                    <td style="text-align:right;font-family:monospace;color:#16a34a">{{ '{:,}'.format(td.get('organic_monthly', 0)) }}</td>
+                    <td style="text-align:right;font-family:monospace;color:#2563eb">{{ '{:,}'.format(td.get('paid_monthly', 0)) }}</td>
+                    <td style="text-align:right;font-family:monospace;font-weight:700">{{ '{:,}'.format(td.get('total_monthly', 0)) }}</td>
+                    <td style="text-align:right">
+                        <span class="badge {% if td.get('domain_score', 0) >= 70 %}badge-green{% elif td.get('domain_score', 0) >= 40 %}badge-amber{% else %}badge-purple{% endif %}">{{ td.get('domain_score', '—') }}</span>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
 
     <!-- AI Keywords -->
     {% if ai_data_p %}
@@ -238,6 +272,38 @@
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+    {% endif %}
+
+    <!-- Online Sentiment -->
+    {% set sentiment_data = kw_data.get('sentiment', {}) %}
+    {% if sentiment_data %}
+    <div class="section">
+        <div class="section-title">Online Sentiment</div>
+        {% for key, sd in sentiment_data.items() %}
+        {% if sd is mapping and sd.get('total_analyzed', 0) > 0 %}
+        <div style="margin-bottom:12px;padding:10px;background:#F8F7FF;border-radius:8px;border:1px solid #EDE9FE">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <div style="font-weight:700;font-size:11px">{{ sd.get('brand_name', key) }}</div>
+                <div style="font-size:9px;color:#94a3b8">{{ sd.get('total_analyzed', 0) }} data points</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center">
+                <div style="background:#f0fdf4;border-radius:6px;padding:6px">
+                    <div style="font-weight:700;color:#16a34a;font-size:14px">{{ sd.get('positive_pct', 0) }}%</div>
+                    <div style="font-size:8px;color:#94a3b8">Positive</div>
+                </div>
+                <div style="background:#f8fafc;border-radius:6px;padding:6px">
+                    <div style="font-weight:700;color:#64748b;font-size:14px">{{ sd.get('neutral_pct', 0) }}%</div>
+                    <div style="font-size:8px;color:#94a3b8">Neutral</div>
+                </div>
+                <div style="background:#fef2f2;border-radius:6px;padding:6px">
+                    <div style="font-weight:700;color:#dc2626;font-size:14px">{{ sd.get('negative_pct', 0) }}%</div>
+                    <div style="font-size:8px;color:#94a3b8">Negative</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
     </div>
     {% endif %}
 

@@ -808,44 +808,68 @@
     {# ═══════════════════════════════════════
        SECTION 6: META ADS
     ═══════════════════════════════════════ #}
-    {% if ads_data %}
-    {% set has_ads = namespace(val=false) %}
-    {% for key, ad in ads_data.items() %}{% if ad.get('ads') %}{% set has_ads.val = true %}{% endif %}{% endfor %}
-    {% if has_ads.val %}
     <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
         <div class="flex items-center gap-2 mb-5">
             <span class="material-symbols-outlined text-blue-600 text-[22px]">campaign</span>
             <h2 class="text-lg font-semibold text-gray-800">Adverts — Meta & Google</h2>
         </div>
-        {% for key, ad in ads_data.items() %}
-        {% if ad.get('ads') %}
-        <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
-            <h3 class="font-semibold text-gray-700 text-sm mb-3">Ads for "{{ ad.get('search_term', key) }}" <span class="text-xs text-gray-400 font-normal">({{ ad.get('total', 0) }} found)</span></h3>
-            <div class="space-y-2">
-                {% for a in ad.get('ads', [])[:5] %}
-                <div class="flex items-center justify-between p-3 bg-blue-50/30 rounded-xl border border-blue-100 text-xs">
-                    <div>
-                        <p class="font-medium text-gray-800">{{ a.get('page_name', '') }}</p>
-                        <p class="text-gray-400">Started: {{ a.get('started', 'Unknown') }}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-gray-500">{{ a.get('impressions', 'N/A') }} impressions</p>
-                        {% if a.get('snapshot_url') %}<a href="{{ a.get('snapshot_url') }}" target="_blank" class="text-brand hover:underline">View Ad</a>{% endif %}
-                    </div>
-                </div>
-                {% endfor %}
+
+        {# META ADS #}
+        <div class="mb-5">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="material-symbols-outlined text-[16px] text-blue-600">thumb_up</span>
+                <h3 class="font-semibold text-gray-700 text-sm">Meta Ads (Facebook & Instagram)</h3>
             </div>
+            {% set has_meta = namespace(val=false) %}
+            {% if ads_data %}{% for key, ad in ads_data.items() %}{% if ad.get('ads') %}{% set has_meta.val = true %}{% endif %}{% endfor %}{% endif %}
+            {% if has_meta.val %}
+            {% for key, ad in ads_data.items() %}
+            {% if ad.get('ads') %}
+            <div class="mb-3 pb-3 border-b border-gray-50 last:border-0">
+                <p class="text-xs font-semibold text-gray-500 mb-2">Ads for "{{ ad.get('search_term', key) }}" <span class="font-normal text-gray-400">({{ ad.get('total', 0) }} found)</span></p>
+                <div class="space-y-2">
+                    {% for a in ad.get('ads', [])[:5] %}
+                    <div class="flex items-center justify-between p-3 bg-blue-50/30 rounded-xl border border-blue-100 text-xs">
+                        <div>
+                            <p class="font-medium text-gray-800">{{ a.get('page_name', '') }}</p>
+                            <p class="text-gray-400">Started: {{ a.get('started', 'Unknown') }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-gray-500">{{ a.get('impressions', 'N/A') }} impressions</p>
+                            {% if a.get('snapshot_url') %}<a href="{{ a.get('snapshot_url') }}" target="_blank" class="text-brand hover:underline">View Ad →</a>{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% elif ads_data %}
+            {# Ads ran but returned errors / no results #}
+            {% set meta_err = '' %}
+            {% for key, ad in ads_data.items() %}{% if ad.get('error') and not meta_err %}{% set meta_err = ad.get('error') %}{% endif %}{% endfor %}
+            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
+                {% if 'access token' in meta_err|lower or 'token' in meta_err|lower %}
+                    Meta Ads require a Facebook Access Token. Configure it in Settings → Meta credentials.
+                {% else %}
+                    No active Meta ads found for this period{% if meta_err %} ({{ meta_err[:80] }}){% endif %}.
+                {% endif %}
+            </p>
+            {% else %}
+            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">Meta Ads credentials not configured. Add a Facebook Access Token in Settings to enable this section.</p>
+            {% endif %}
         </div>
-        {% endif %}
-        {% endfor %}
-        <!-- Google Ads -->
-        <div class="mt-4 pt-4 border-t border-gray-100">
+
+        {# GOOGLE ADS #}
+        <div class="pt-4 border-t border-gray-100">
             <div class="flex items-center gap-2 mb-3">
                 <span class="material-symbols-outlined text-[16px] text-yellow-500">ads_click</span>
                 <h3 class="font-semibold text-gray-700 text-sm">Google Search Ads</h3>
             </div>
             {% set google_ads_data = kw_data.get('google_ads', {}) %}
-            {% if google_ads_data %}
+            {% set has_google = namespace(val=false) %}
+            {% if google_ads_data %}{% for kw, gad in google_ads_data.items() %}{% if gad.get('avg_monthly_searches', 0) > 0 %}{% set has_google.val = true %}{% endif %}{% endfor %}{% endif %}
+            {% if has_google.val %}
             <div class="space-y-2">
                 {% for kw, gad in google_ads_data.items() %}
                 {% if gad.get('avg_monthly_searches', 0) > 0 %}
@@ -863,12 +887,10 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">Google Ads data will appear here once the Google Ads API access is approved (pending developer token).</p>
+            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">Google Ads keyword data not available. This requires a Google Ads developer token — contact us to set up access.</p>
             {% endif %}
         </div>
     </div>
-    {% endif %}
-    {% endif %}
 
     {# ═══════════════════════════════════════
        SECTION 7: LINKEDIN JOBS

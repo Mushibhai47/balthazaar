@@ -213,6 +213,9 @@ def edit_client(client_id):
     client.contact_name = request.form.get("contact_name", client.contact_name).strip()
     client.contact_email = request.form.get("contact_email", client.contact_email).strip()
     client.subscription_tier = request.form.get("subscription_tier", client.subscription_tier)
+    recipients_raw = request.form.get("report_recipients", "")
+    extra_emails = [e.strip() for e in recipients_raw.replace(',', '\n').split('\n') if e.strip() and '@' in e]
+    client.set_report_recipients(extra_emails)
 
     db.session.commit()
     flash(f"Client '{client.name}' updated.", "success")
