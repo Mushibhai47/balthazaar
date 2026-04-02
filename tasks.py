@@ -71,7 +71,7 @@ COLLECTORS_CONFIG = [
 ]
 
 
-def send_report_email(report, client, query, report_data, note=''):
+def send_report_email(report, client, query, report_data, note='', extra_recipients=None):
     """Send report completion email to the client contact"""
     smtp_host = os.environ.get('SMTP_HOST', '')
     smtp_user = os.environ.get('SMTP_USER', '')
@@ -99,6 +99,12 @@ def send_report_email(report, client, query, report_data, note=''):
         return
     to_email = client.contact_email
     to_name = client.contact_name
+    # Additional recipients (can include dozens of emails)
+    stored = client.get_report_recipients() if hasattr(client, 'get_report_recipients') else []
+    one_off = extra_recipients or []
+    all_recipients = list({to_email} | set(stored) | set(one_off))  # deduplicate
+    # Always BCC Balthazaar
+    bcc_email = os.environ.get('BALTHAZAAR_EMAIL', 'hello@balthazaar.net')
 
     meta = report_data.get('metadata', {})
     succeeded = len(meta.get('sources_succeeded', []))
@@ -153,7 +159,7 @@ def send_report_email(report, client, query, report_data, note=''):
         <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Avg CPC</div>
       </div>
       <div style="flex:1;background:#f0f9ff;border-radius:12px;padding:16px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:#0284c7">{succeeded}/13</div>
+        <div style="font-size:28px;font-weight:700;color:#0284c7">{succeeded}/15</div>
         <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Sources</div>
       </div>
     </div>
@@ -178,15 +184,67 @@ def send_report_email(report, client, query, report_data, note=''):
         msg['Subject'] = f"[{client.name}] Intelligence Report Ready — {date_str}"
         msg['From'] = f"Balthazaar Intelligence <{smtp_from}>"
         msg['To'] = f"{to_name} <{to_email}>"
+        if len(all_recipients) > 1:
+            msg['CC'] = ', '.join(r for r in all_recipients if r != to_email)
+        msg['Bcc'] = bcc_email
+        msg.attach(MIMEText(html, 'html'))
+        send_to = list(set(all_recipients + [bcc_email]))
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_from, send_to, msg.as_string())
+        logger.info(f"Report email sent to {to_email}")
+    except Exception as e:
+        logger.error(f"Failed to send report email: {e}")
+
+
+def send_new_client_notification(client, keywords, countries):
+    """Send notification to hello@balthazaar.net when a new client form is submitted"""
+    smtp_host = os.environ.get('SMTP_HOST', '')
+    smtp_user = os.environ.get('SMTP_USER', '')
+    smtp_pass = os.environ.get('SMTP_PASSWORD', '')
+    smtp_port = int(os.environ.get('SMTP_PORT', 587))
+    smtp_from = os.environ.get('SMTP_FROM', smtp_user)
+    notify_to = os.environ.get('BALTHAZAAR_EMAIL', 'hello@balthazaar.net')
+
+    if not smtp_host or not smtp_user or not smtp_pass:
+        logger.info("SMTP not configured — skipping new client notification")
+        return
+
+    html = f"""<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8f7ff;padding:40px">
+<div style="max-width:560px;margin:0 auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(107,81,240,0.1)">
+  <div style="background:linear-gradient(135deg,#6B51F0,#8B5CF6);padding:28px 36px">
+    <h1 style="color:white;margin:0;font-size:20px">New Client Form Submitted</h1>
+    <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px">Balthazaar Intelligence Platform</p>
+  </div>
+  <div style="padding:28px 36px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px">
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600;width:140px">Client Name</td><td style="padding:8px 0;color:#1a1a2e;font-weight:700">{client.name}</td></tr>
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600">Website</td><td style="padding:8px 0;color:#6B51F0">{client.website}</td></tr>
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600">Contact</td><td style="padding:8px 0;color:#374151">{client.contact_name} &lt;{client.contact_email}&gt;</td></tr>
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600">Keywords</td><td style="padding:8px 0;color:#374151">{len(keywords)} keywords</td></tr>
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600">Countries</td><td style="padding:8px 0;color:#374151">{', '.join(countries)}</td></tr>
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600">Tier</td><td style="padding:8px 0;color:#374151">{client.subscription_tier}</td></tr>
+    </table>
+    <p style="font-size:12px;color:#94a3b8;margin:0">Log in to the dashboard to review and run the first report.</p>
+  </div>
+</div></body></html>"""
+
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"New Client: {client.name} — Form Submitted"
+        msg['From'] = f"Balthazaar Intelligence <{smtp_from}>"
+        msg['To'] = notify_to
         msg.attach(MIMEText(html, 'html'))
         with smtplib.SMTP(smtp_host, smtp_port) as server:
             server.ehlo()
             server.starttls()
             server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_from, [to_email], msg.as_string())
-        logger.info(f"Report email sent to {to_email}")
+            server.sendmail(smtp_from, [notify_to], msg.as_string())
+        logger.info(f"New client notification sent to {notify_to}")
     except Exception as e:
-        logger.error(f"Failed to send report email: {e}")
+        logger.error(f"Failed to send new client notification: {e}")
 
 
 def run_report_sync(report_id: int):

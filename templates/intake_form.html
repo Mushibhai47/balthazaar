@@ -307,12 +307,34 @@
             </div>
         </div>
 
+        <!-- Report Recipients -->
+        <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="material-symbols-outlined text-brand text-[22px]">group</span>
+                <h2 class="text-lg font-semibold text-gray-800">Report Recipients</h2>
+            </div>
+            <p class="text-sm text-gray-500 mb-3">Add all email addresses that should receive the completed reports. One per line or comma-separated. The primary contact email above is always included.</p>
+            <textarea name="report_recipients" rows="4"
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition resize-none"
+                placeholder="colleague@company.com&#10;manager@company.com&#10;partner@agency.com"></textarea>
+        </div>
+
         <!-- Confirmation -->
         <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-            <label class="flex items-start gap-3 cursor-pointer">
+            <label class="flex items-start gap-3 cursor-pointer mb-4">
                 <input type="checkbox" name="confirm_accuracy" required class="w-5 h-5 mt-0.5 text-brand rounded-md focus:ring-brand border-gray-300">
                 <span class="text-sm text-gray-600 leading-relaxed">I confirm that all information provided is accurate and understand that pricing may deviate based on the scope of data tracked. Subscriptions are auto-renewable and can be cancelled within 31 days advance notice.</span>
             </label>
+            {% set nda_url = config.get('NDA_URL', '') if config is defined else '' %}
+            {% set contract_url = config.get('CONTRACT_URL', '') if config is defined else '' %}
+            <div class="flex gap-4 pt-3 border-t border-gray-100">
+                <a href="{{ nda_url or '#' }}" target="_blank" class="inline-flex items-center gap-1.5 text-sm text-brand hover:underline {% if not nda_url %}opacity-40 pointer-events-none{% endif %}">
+                    <span class="material-symbols-outlined text-[16px]">description</span> Non-Disclosure Agreement (NDA)
+                </a>
+                <a href="{{ contract_url or '#' }}" target="_blank" class="inline-flex items-center gap-1.5 text-sm text-brand hover:underline {% if not contract_url %}opacity-40 pointer-events-none{% endif %}">
+                    <span class="material-symbols-outlined text-[16px]">contract</span> Service Contract
+                </a>
+            </div>
         </div>
 
         <!-- Submit -->

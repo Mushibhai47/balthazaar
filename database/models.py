@@ -23,6 +23,7 @@ class Client(db.Model):
     contact_email = db.Column(db.String(255), nullable=False)
     subscription_tier = db.Column(db.String(50), default="trial")  # trial, 6month, 1year
     portal_token = db.Column(db.String(64), unique=True, nullable=True)  # client self-service portal
+    report_recipients = db.Column(db.Text, default="[]")  # JSON list of additional email recipients
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     competitors = db.relationship("Competitor", backref="client", cascade="all, delete-orphan")
@@ -33,6 +34,15 @@ class Client(db.Model):
 
     def set_social_handles(self, handles):
         self.social_handles = json.dumps(handles)
+
+    def get_report_recipients(self):
+        try:
+            return json.loads(self.report_recipients) if self.report_recipients else []
+        except Exception:
+            return []
+
+    def set_report_recipients(self, emails):
+        self.report_recipients = json.dumps([e.strip() for e in emails if e.strip()])
 
 
 class Competitor(db.Model):

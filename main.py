@@ -55,6 +55,13 @@ with app.app_context():
             conn.commit()
     except Exception:
         pass  # Column already exists
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE clients ADD COLUMN report_recipients TEXT DEFAULT '[]'"))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists
 
 
 # --- Dashboard ---
@@ -166,7 +173,20 @@ def new_client():
     query.set_countries(countries)
     db.session.add(query)
 
+    # Report recipients
+    recipients_raw = request.form.get("report_recipients", "")
+    extra_emails = [e.strip() for e in recipients_raw.replace(',', '\n').split('\n') if e.strip() and '@' in e]
+    client.set_report_recipients(extra_emails)
+
     db.session.commit()
+
+    # Notify hello@balthazaar.net that a new client form was submitted
+    try:
+        from tasks import send_new_client_notification
+        send_new_client_notification(client, keywords, countries)
+    except Exception as e:
+        logger.warning(f"New client notification failed: {e}")
+
     flash(f"Client '{client_name}' created with {len(keywords)} keywords and {len(countries)} countries.", "success")
     return redirect(url_for("dashboard"))
 
@@ -513,13 +533,16 @@ def email_report(report_id):
     query = report.query
     client = query.client
     note = request.form.get('note', '').strip()
+    extra_raw = request.form.get('extra_recipients', '')
+    extra_emails = [e.strip() for e in extra_raw.replace(',', '\n').split('\n') if e.strip() and '@' in e]
     try:
         data = json.loads(report.data) if report.data else {}
     except json.JSONDecodeError:
         data = {}
     try:
-        send_report_email(report, client, query, data, note=note)
-        flash(f"Report emailed to {client.contact_email}.", "success")
+        send_report_email(report, client, query, data, note=note, extra_recipients=extra_emails)
+        all_count = 1 + len(client.get_report_recipients()) + len(extra_emails)
+        flash(f"Report emailed to {all_count} recipient(s).", "success")
     except Exception as e:
         flash(f"Email failed: {str(e)}", "error")
     return redirect(url_for("view_report", report_id=report_id))

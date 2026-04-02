@@ -250,9 +250,9 @@
                 <thead>
                     <tr class="border-b border-gray-100">
                         <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Website</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Organic / mo</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Paid / mo</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Total / mo</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Organic For Period</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Paid For Period</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Total For Period</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Domain Score</th>
                     </tr>
                 </thead>
@@ -926,16 +926,22 @@
         </div>
         <form action="/reports/{{ report.id }}/email" method="post">
             <div class="mb-4">
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Sending to</label>
-                <p class="text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">{{ client.contact_name }} &lt;{{ client.contact_email }}&gt;</p>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Recipients</label>
+                <div class="text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg space-y-0.5">
+                    <div>{{ client.contact_name }} &lt;{{ client.contact_email }}&gt; <span class="text-[10px] text-brand font-semibold">PRIMARY</span></div>
+                    {% for r in client.get_report_recipients() %}
+                    <div class="text-gray-500">{{ r }}</div>
+                    {% endfor %}
+                </div>
+                <div class="mt-2">
+                    <label class="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Add extra recipients for this send (optional)</label>
+                    <input type="text" name="extra_recipients" placeholder="email1@co.com, email2@co.com"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand">
+                </div>
             </div>
             <div class="mb-4">
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Personal Note <span class="text-gray-400 font-normal">(optional)</span></label>
-                <textarea name="note" rows="4" placeholder="Hi {{ client.contact_name }}, please find your latest intelligence report attached..." class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand resize-none"></textarea>
-            </div>
-            <div class="flex items-center gap-2 mb-5">
-                <input type="checkbox" name="attach_pdf" id="attach_pdf" value="1" checked class="rounded">
-                <label for="attach_pdf" class="text-sm text-gray-600">Include PDF + live report link</label>
+                <textarea name="note" rows="3" placeholder="Hi {{ client.contact_name }}, please find your latest intelligence report attached..." class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand resize-none"></textarea>
             </div>
             <div class="flex gap-3">
                 <button type="submit" class="flex-1 bg-brand text-white py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition">Send Email</button>
