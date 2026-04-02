@@ -53,17 +53,23 @@ Generate a JSON response with this exact structure:
   "top_opportunities": [
     {{"title": "Opportunity name", "description": "1-2 sentence description", "priority": "HIGH/MEDIUM/LOW"}},
     {{"title": "...", "description": "...", "priority": "..."}},
+    {{"title": "...", "description": "...", "priority": "..."}},
+    {{"title": "...", "description": "...", "priority": "..."}},
     {{"title": "...", "description": "...", "priority": "..."}}
   ],
   "competitive_threats": [
     {{"competitor": "competitor name or 'Market'", "threat": "specific threat description", "severity": "HIGH/MEDIUM/LOW"}},
+    {{"competitor": "...", "threat": "...", "severity": "..."}},
+    {{"competitor": "...", "threat": "...", "severity": "..."}},
+    {{"competitor": "...", "threat": "...", "severity": "..."}},
     {{"competitor": "...", "threat": "...", "severity": "..."}}
   ],
   "recommended_actions": [
     "Specific action item 1",
     "Specific action item 2",
     "Specific action item 3",
-    "Specific action item 4"
+    "Specific action item 4",
+    "Specific action item 5"
   ],
   "market_position": "STRONG/MODERATE/DEVELOPING",
   "overall_score": 72
