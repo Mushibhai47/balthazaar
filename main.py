@@ -55,6 +55,20 @@ with app.app_context():
             conn.commit()
     except Exception:
         pass  # Column already exists
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE clients ADD COLUMN report_recipients TEXT DEFAULT '[]'"))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE reports ADD COLUMN country VARCHAR(100)"))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists
 
 
 # --- Dashboard ---
@@ -166,7 +180,20 @@ def new_client():
     query.set_countries(countries)
     db.session.add(query)
 
+    # Report recipients
+    recipients_raw = request.form.get("report_recipients", "")
+    extra_emails = [e.strip() for e in recipients_raw.replace(',', '\n').split('\n') if e.strip() and '@' in e]
+    client.set_report_recipients(extra_emails)
+
     db.session.commit()
+
+    # Notify hello@balthazaar.net that a new client form was submitted
+    try:
+        from tasks import send_new_client_notification
+        send_new_client_notification(client, keywords, countries)
+    except Exception as e:
+        logger.warning(f"New client notification failed: {e}")
+
     flash(f"Client '{client_name}' created with {len(keywords)} keywords and {len(countries)} countries.", "success")
     return redirect(url_for("dashboard"))
 
@@ -193,6 +220,9 @@ def edit_client(client_id):
     client.contact_name = request.form.get("contact_name", client.contact_name).strip()
     client.contact_email = request.form.get("contact_email", client.contact_email).strip()
     client.subscription_tier = request.form.get("subscription_tier", client.subscription_tier)
+    recipients_raw = request.form.get("report_recipients", "")
+    extra_emails = [e.strip() for e in recipients_raw.replace(',', '\n').split('\n') if e.strip() and '@' in e]
+    client.set_report_recipients(extra_emails)
 
     db.session.commit()
     flash(f"Client '{client.name}' updated.", "success")
@@ -253,16 +283,27 @@ def run_report(query_id):
     from tasks import run_report_sync
 
     query = db.get_or_404(Query, query_id)
+    countries = query.get_countries()
 
-    # Create new report
-    report = Report(query_id=query.id, status="pending")
-    db.session.add(report)
-    db.session.commit()
-
-    # Run in background thread (no Redis/Celery required)
-    t = threading.Thread(target=run_report_sync, args=(report.id,), daemon=True)
-    t.start()
-    flash("Report generation started! Data is being collected from all sources.", "success")
+    if len(countries) > 1:
+        # Create one report per country and run each in its own thread
+        for country in countries:
+            report = Report(query_id=query.id, status="pending", country=country)
+            db.session.add(report)
+            db.session.flush()  # get report.id before commit
+            db.session.commit()
+            t = threading.Thread(target=run_report_sync, args=(report.id, country), daemon=True)
+            t.start()
+        flash(f"Report generation started for {len(countries)} countries! Data is being collected from all sources.", "success")
+    else:
+        # Single country (or none set) — run one combined report
+        country = countries[0] if countries else None
+        report = Report(query_id=query.id, status="pending", country=country)
+        db.session.add(report)
+        db.session.commit()
+        t = threading.Thread(target=run_report_sync, args=(report.id, country), daemon=True)
+        t.start()
+        flash("Report generation started! Data is being collected from all sources.", "success")
 
     return redirect(url_for("view_client", client_id=query.client_id))
 
@@ -522,13 +563,16 @@ def email_report(report_id):
     query = report.query
     client = query.client
     note = request.form.get('note', '').strip()
+    extra_raw = request.form.get('extra_recipients', '')
+    extra_emails = [e.strip() for e in extra_raw.replace(',', '\n').split('\n') if e.strip() and '@' in e]
     try:
         data = json.loads(report.data) if report.data else {}
     except json.JSONDecodeError:
         data = {}
     try:
-        send_report_email(report, client, query, data, note=note)
-        flash(f"Report emailed to {client.contact_email}.", "success")
+        send_report_email(report, client, query, data, note=note, extra_recipients=extra_emails)
+        all_count = 1 + len(client.get_report_recipients()) + len(extra_emails)
+        flash(f"Report emailed to {all_count} recipient(s).", "success")
     except Exception as e:
         flash(f"Email failed: {str(e)}", "error")
     return redirect(url_for("view_report", report_id=report_id))

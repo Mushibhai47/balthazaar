@@ -40,8 +40,9 @@
                     <span class="font-medium text-gray-700">{{ client.name }}</span> ·
                     {% if report.generated_at %}{{ report.generated_at.strftime('%b %d, %Y at %H:%M UTC') }}{% else %}{{ report.created_at.strftime('%b %d, %Y') }}{% endif %}
                     · <strong>{{ keywords|length }}</strong> keywords
-                    {% set countries = query.get_countries() %}
-                    {% if countries %} · {{ countries|join(', ') }}{% endif %}
+                    {% if report.country %}
+                    · <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium">🌏 {{ report.country }}</span>
+                    {% else %}{% set countries = query.get_countries() %}{% if countries %} · {{ countries|join(', ') }}{% endif %}{% endif %}
                     {% if query.period_start and query.period_end %} · {{ query.period_start.strftime('%d %b %Y') }} – {{ query.period_end.strftime('%d %b %Y') }}{% endif %}
                 </p>
                 {% if competitors %}
@@ -131,12 +132,6 @@
                 class="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-white border border-brand/30 text-brand hover:bg-brand/5 transition no-print">
                 <span class="material-symbols-outlined text-[14px]">edit</span> Edit
             </button>
-            {% if insights.get('overall_score') %}
-            <div class="text-center">
-                <div class="text-2xl font-bold text-brand">{{ insights.overall_score }}<span class="text-sm text-gray-400 font-normal">/100</span></div>
-                <div class="text-xs text-gray-400">ChatGPT Market Score</div>
-            </div>
-            {% endif %}
         </div>
         <p class="text-gray-700 text-sm leading-relaxed mb-5">{{ insights.executive_summary }}</p>
 
@@ -200,7 +195,7 @@
         </div>
         {% if insights.get('competitor_scores') %}
         <div class="mt-5 pt-4 border-t border-brand/10">
-            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">ChatGPT Market Score — All Entities</h4>
+            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">ChatGPT Market Score</h4>
             <div class="flex flex-wrap gap-3">
                 <div class="bg-white rounded-xl px-4 py-3 border border-brand/20 text-center min-w-[100px]">
                     <div class="text-xl font-bold text-brand">{{ insights.overall_score }}<span class="text-xs text-gray-400">/100</span></div>
@@ -234,6 +229,8 @@
             <span class="material-symbols-outlined text-accent text-[28px] mb-1">trending_up</span>
             <p class="text-2xl font-bold text-gray-900">{{ rising_count }}</p>
             <p class="text-xs text-gray-400">Rising Keywords</p>
+            {% set trend_periods = metadata.get('trend_periods_used') %}
+            {% if trend_periods %}<p class="text-[10px] text-brand mt-0.5">{{ trend_periods }}-period data</p>{% endif %}
         </div>
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-purple-500 text-[28px] mb-1">local_atm</span>
@@ -256,9 +253,9 @@
                 <thead>
                     <tr class="border-b border-gray-100">
                         <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Website</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Organic / mo</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Paid / mo</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Total / mo</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Organic For Period</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Paid For Period</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Total For Period</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Domain Score</th>
                     </tr>
                 </thead>
@@ -395,10 +392,10 @@
                     <tr class="border-b border-gray-100">
                         <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Keyword</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Volume</th>
+                        <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Trend</th>
                         <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Competition</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">CPC</th>
-                        <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Trend</th>
-                        <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Insight</th>
+                        <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase" style="min-width:200px">Insight</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -408,6 +405,17 @@
                         <td class="py-3 px-3 font-medium text-gray-800 text-sm">{{ kw }}</td>
                         <td class="py-3 px-3 text-right text-gray-600 font-mono text-xs">
                             {% if kd.get('search_volume', 0) > 0 %}{{ '{:,}'.format(kd.get('search_volume')) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                        </td>
+                        <td class="py-3 px-3 text-center font-bold text-base">
+                            {% set trend = kd.get('trend', '') %}
+                            {% set trend_pct = kd.get('trend_pct') %}
+                            {% set trend_periods = kd.get('trend_periods') %}
+                            {% if trend == 'rising' %}
+                            <span class="text-emerald-500" title="Rising{% if trend_pct %} {{ '%+.1f'|format(trend_pct) }}% over {{ trend_periods }} periods{% endif %}">↑{% if trend_pct %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(trend_pct) }}%</span>{% endif %}</span>
+                            {% elif trend == 'declining' %}
+                            <span class="text-red-400" title="Declining{% if trend_pct %} {{ '%+.1f'|format(trend_pct) }}% over {{ trend_periods }} periods{% endif %}">↓{% if trend_pct %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(trend_pct) }}%</span>{% endif %}</span>
+                            {% elif trend == 'stable' %}<span class="text-amber-400" title="Stable">—</span>
+                            {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
                         </td>
                         <td class="py-3 px-3 text-center">
                             {% set comp = kd.get('competition', '') %}
@@ -419,66 +427,13 @@
                         <td class="py-3 px-3 text-right font-mono text-xs text-gray-600">
                             {% if kd.get('estimated_cpc', 0) > 0 %}${{ '%.2f'|format(kd.get('estimated_cpc', 0)) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                         </td>
-                        <td class="py-3 px-3 text-center font-bold text-base">
-                            {% set trend = kd.get('trend', '') %}
-                            {% if trend == 'rising' %}<span class="text-emerald-500">↑</span>
-                            {% elif trend == 'declining' %}<span class="text-red-400">↓</span>
-                            {% elif trend == 'stable' %}<span class="text-blue-400">—</span>
-                            {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
-                        </td>
-                        <td class="py-3 px-3 text-gray-500 text-xs max-w-xs" title="{{ kd.get('insight', '') }}">{{ (kd.get('insight', '') or '')[:80] }}{% if kd.get('insight', '')|length > 80 %}…{% endif %}</td>
+                        <td class="py-3 px-3 text-gray-500 text-xs" style="min-width:200px" title="{{ kd.get('insight', '') }}">{{ (kd.get('insight', '') or '')[:120] }}{% if (kd.get('insight', '') or '')|length > 120 %}…{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
         {% if ai_data %}
-        {% set cpc_kws = [] %}
-        {% set cpc_vals = [] %}
-        {% for kw in keywords %}
-            {% set cpc = ai_data.get(kw, {}).get('estimated_cpc', 0) %}
-            {% if cpc > 0 %}
-                {% set _ = cpc_kws.append(kw) %}
-                {% set _ = cpc_vals.append(cpc) %}
-            {% endif %}
-        {% endfor %}
-        {% if cpc_kws %}
-        <div class="mt-5 pt-5 border-t border-gray-100">
-            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">CPC Comparison (USD)</p>
-            <canvas id="cpcChart" height="80"></canvas>
-            <script>
-            (function() {
-                const labels = {{ cpc_kws[:10] | tojson }};
-                const data = {{ cpc_vals[:10] | tojson }};
-                const ctx = document.getElementById('cpcChart');
-                if (!ctx || typeof Chart === 'undefined') return;
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'CPC ($)',
-                            data: data,
-                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                            borderColor: 'rgba(16, 185, 129, 0.8)',
-                            borderWidth: 2,
-                            borderRadius: 6,
-                            borderSkipped: false,
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '$' + c.parsed.y.toFixed(2) } } },
-                        scales: {
-                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { callback: v => '$'+v, font: { size: 10 } } },
-                            x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 30 } }
-                        }
-                    }
-                });
-            })();
-            </script>
-        </div>
-        {% endif %}
         {% endif %}
     </div>
     {% endif %}
@@ -500,8 +455,7 @@
     <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
         <div class="flex items-center gap-2 mb-5">
             <span class="material-symbols-outlined text-brand text-[22px]">bar_chart</span>
-            <h2 class="text-lg font-semibold text-gray-800">Keyword Volume — Top {{ [chart_kws|length, 10]|min }}</h2>
-            <span class="text-xs text-gray-400 ml-auto">Search volume by keyword</span>
+            <h2 class="text-lg font-semibold text-gray-800">Top 10 Keywords / AI Prompts By Highest Volume</h2>
         </div>
         <canvas id="kwVolumeChart" height="120"></canvas>
         <script>
@@ -599,9 +553,14 @@
         {% for key, yd in yt_data.items() %}{% if yd.get('is_channel') %}{% set has_channels.val = true %}{% endif %}{% endfor %}
         {% if has_channels.val %}
         <div class="mt-6 pt-6 border-t border-gray-100">
-            <h3 class="text-sm font-semibold text-gray-700 mb-4">Competitor Channel Activity</h3>
+            <h3 class="text-sm font-semibold text-gray-700 mb-4">Competitor Channel Activity — Top 5 by Engagement Rate</h3>
+            {% set channel_list = [] %}
             {% for key, yd in yt_data.items() %}
-            {% if yd.get('is_channel') and yd.get('videos') %}
+                {% if yd.get('is_channel') and yd.get('videos') %}{% set _ = channel_list.append(yd) %}{% endif %}
+            {% endfor %}
+            {% set channel_list = channel_list | sort(attribute='avg_engagement_rate', reverse=true) %}
+            {% for yd in channel_list[:5] %}
+            {% if true %}
             <div class="mb-5 pb-5 border-b border-gray-100 last:border-0">
                 <div class="flex items-center justify-between mb-3">
                     <h4 class="font-medium text-sm {% if yd.get('is_client') %}text-brand{% else %}text-gray-700{% endif %}">
@@ -662,7 +621,7 @@
                         {% if sd.get('brand_type') == 'client' %}🏢{% else %}🏬{% endif %}
                         {{ sd.get('brand_name', key) }}
                     </h3>
-                    <span class="text-xs text-gray-400">{{ sd.get('total_analyzed', 0) }} sources</span>
+                    <span class="text-xs text-gray-400">{{ sd.get('total_analyzed', 0) }} data points</span>
                 </div>
                 <div class="flex gap-2">
                     <div class="flex-1 bg-emerald-50 rounded-lg p-2 text-center">
@@ -680,8 +639,8 @@
                 </div>
                 {% if sd.get('top_positive') %}
                 <div class="mt-3">
-                    <p class="text-[10px] font-semibold text-emerald-600 mb-1">Top Positive</p>
-                    {% for c in sd.get('top_positive', [])[:3] %}
+                    <p class="text-[10px] font-semibold text-emerald-600 mb-1">Top 5 Positive</p>
+                    {% for c in sd.get('top_positive', [])[:5] %}
                     <div class="bg-emerald-50/50 rounded p-1.5 mb-1 text-[11px] text-gray-600">
                         "{{ ((c.get('text', '') or c.get('title', '')) | striptags)[:100] }}"
                         {% if c.get('url') %}<a href="{{ c.url }}" target="_blank" class="text-brand ml-1">↗</a>{% elif c.get('link') and c.get('link').startswith('http') %}<a href="{{ c.link }}" target="_blank" class="text-brand ml-1">↗</a>{% endif %}
@@ -691,8 +650,8 @@
                 {% endif %}
                 {% if sd.get('top_negative') %}
                 <div class="mt-2">
-                    <p class="text-[10px] font-semibold text-red-500 mb-1">Top Negative</p>
-                    {% for c in sd.get('top_negative', [])[:3] %}
+                    <p class="text-[10px] font-semibold text-red-500 mb-1">Top 5 Negative</p>
+                    {% for c in sd.get('top_negative', [])[:5] %}
                     <div class="bg-red-50/50 rounded p-1.5 mb-1 text-[11px] text-gray-600">
                         "{{ ((c.get('text', '') or c.get('title', '')) | striptags)[:100] }}"
                         {% if c.get('url') %}<a href="{{ c.url }}" target="_blank" class="text-brand ml-1">↗</a>{% elif c.get('link') and c.get('link').startswith('http') %}<a href="{{ c.link }}" target="_blank" class="text-brand ml-1">↗</a>{% endif %}
@@ -845,7 +804,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-xs text-gray-400">{{ wd.get('message', 'No changes detected') }}</p>
+            <p class="text-xs text-gray-400">{{ wd.get('message', 'No changes during this period') | replace('No recent snapshots in last 30 days', 'No changes during this period') }}</p>
             {% endif %}
         </div>
         {% endif %}
@@ -856,44 +815,68 @@
     {# ═══════════════════════════════════════
        SECTION 6: META ADS
     ═══════════════════════════════════════ #}
-    {% if ads_data %}
-    {% set has_ads = namespace(val=false) %}
-    {% for key, ad in ads_data.items() %}{% if ad.get('ads') %}{% set has_ads.val = true %}{% endif %}{% endfor %}
-    {% if has_ads.val %}
     <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
         <div class="flex items-center gap-2 mb-5">
             <span class="material-symbols-outlined text-blue-600 text-[22px]">campaign</span>
             <h2 class="text-lg font-semibold text-gray-800">Adverts — Meta & Google</h2>
         </div>
-        {% for key, ad in ads_data.items() %}
-        {% if ad.get('ads') %}
-        <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
-            <h3 class="font-semibold text-gray-700 text-sm mb-3">Ads for "{{ ad.get('search_term', key) }}" <span class="text-xs text-gray-400 font-normal">({{ ad.get('total', 0) }} found)</span></h3>
-            <div class="space-y-2">
-                {% for a in ad.get('ads', [])[:5] %}
-                <div class="flex items-center justify-between p-3 bg-blue-50/30 rounded-xl border border-blue-100 text-xs">
-                    <div>
-                        <p class="font-medium text-gray-800">{{ a.get('page_name', '') }}</p>
-                        <p class="text-gray-400">Started: {{ a.get('started', 'Unknown') }}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-gray-500">{{ a.get('impressions', 'N/A') }} impressions</p>
-                        {% if a.get('snapshot_url') %}<a href="{{ a.get('snapshot_url') }}" target="_blank" class="text-brand hover:underline">View Ad</a>{% endif %}
-                    </div>
-                </div>
-                {% endfor %}
+
+        {# META ADS #}
+        <div class="mb-5">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="material-symbols-outlined text-[16px] text-blue-600">thumb_up</span>
+                <h3 class="font-semibold text-gray-700 text-sm">Meta Ads (Facebook & Instagram)</h3>
             </div>
+            {% set has_meta = namespace(val=false) %}
+            {% if ads_data %}{% for key, ad in ads_data.items() %}{% if ad.get('ads') %}{% set has_meta.val = true %}{% endif %}{% endfor %}{% endif %}
+            {% if has_meta.val %}
+            {% for key, ad in ads_data.items() %}
+            {% if ad.get('ads') %}
+            <div class="mb-3 pb-3 border-b border-gray-50 last:border-0">
+                <p class="text-xs font-semibold text-gray-500 mb-2">Ads for "{{ ad.get('search_term', key) }}" <span class="font-normal text-gray-400">({{ ad.get('total', 0) }} found)</span></p>
+                <div class="space-y-2">
+                    {% for a in ad.get('ads', [])[:5] %}
+                    <div class="flex items-center justify-between p-3 bg-blue-50/30 rounded-xl border border-blue-100 text-xs">
+                        <div>
+                            <p class="font-medium text-gray-800">{{ a.get('page_name', '') }}</p>
+                            <p class="text-gray-400">Started: {{ a.get('started', 'Unknown') }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-gray-500">{{ a.get('impressions', 'N/A') }} impressions</p>
+                            {% if a.get('snapshot_url') %}<a href="{{ a.get('snapshot_url') }}" target="_blank" class="text-brand hover:underline">View Ad →</a>{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% elif ads_data %}
+            {# Ads ran but returned errors / no results #}
+            {% set meta_err = '' %}
+            {% for key, ad in ads_data.items() %}{% if ad.get('error') and not meta_err %}{% set meta_err = ad.get('error') %}{% endif %}{% endfor %}
+            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
+                {% if 'access token' in meta_err|lower or 'token' in meta_err|lower %}
+                    Meta Ads require a Facebook Access Token. Configure it in Settings → Meta credentials.
+                {% else %}
+                    No active Meta ads found for this period{% if meta_err %} ({{ meta_err[:80] }}){% endif %}.
+                {% endif %}
+            </p>
+            {% else %}
+            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">Meta Ads credentials not configured. Add a Facebook Access Token in Settings to enable this section.</p>
+            {% endif %}
         </div>
-        {% endif %}
-        {% endfor %}
-        <!-- Google Ads -->
-        <div class="mt-4 pt-4 border-t border-gray-100">
+
+        {# GOOGLE ADS #}
+        <div class="pt-4 border-t border-gray-100">
             <div class="flex items-center gap-2 mb-3">
                 <span class="material-symbols-outlined text-[16px] text-yellow-500">ads_click</span>
                 <h3 class="font-semibold text-gray-700 text-sm">Google Search Ads</h3>
             </div>
             {% set google_ads_data = kw_data.get('google_ads', {}) %}
-            {% if google_ads_data %}
+            {% set has_google = namespace(val=false) %}
+            {% if google_ads_data %}{% for kw, gad in google_ads_data.items() %}{% if gad.get('avg_monthly_searches', 0) > 0 %}{% set has_google.val = true %}{% endif %}{% endfor %}{% endif %}
+            {% if has_google.val %}
             <div class="space-y-2">
                 {% for kw, gad in google_ads_data.items() %}
                 {% if gad.get('avg_monthly_searches', 0) > 0 %}
@@ -911,12 +894,10 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">Google Ads data will appear here once the Google Ads API access is approved (pending developer token).</p>
+            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">Google Ads keyword data not available. This requires a Google Ads developer token — contact us to set up access.</p>
             {% endif %}
         </div>
     </div>
-    {% endif %}
-    {% endif %}
 
     {# ═══════════════════════════════════════
        SECTION 7: LINKEDIN JOBS
@@ -928,7 +909,7 @@
     <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
         <div class="flex items-center gap-2 mb-5">
             <span class="material-symbols-outlined text-blue-700 text-[22px]">work</span>
-            <h2 class="text-lg font-semibold text-gray-800">Recruitment on LinkedIn</h2>
+            <h2 class="text-lg font-semibold text-gray-800">Recruitment</h2>
         </div>
         {% for key, jd in jobs_data.items() %}
         {% if jd.get('jobs_found', 0) > 0 %}
@@ -974,16 +955,22 @@
         </div>
         <form action="/reports/{{ report.id }}/email" method="post">
             <div class="mb-4">
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Sending to</label>
-                <p class="text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">{{ client.contact_name }} &lt;{{ client.contact_email }}&gt;</p>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Recipients</label>
+                <div class="text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg space-y-0.5">
+                    <div>{{ client.contact_name }} &lt;{{ client.contact_email }}&gt; <span class="text-[10px] text-brand font-semibold">PRIMARY</span></div>
+                    {% for r in client.get_report_recipients() %}
+                    <div class="text-gray-500">{{ r }}</div>
+                    {% endfor %}
+                </div>
+                <div class="mt-2">
+                    <label class="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Add extra recipients for this send (optional)</label>
+                    <input type="text" name="extra_recipients" placeholder="email1@co.com, email2@co.com"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand">
+                </div>
             </div>
             <div class="mb-4">
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Personal Note <span class="text-gray-400 font-normal">(optional)</span></label>
-                <textarea name="note" rows="4" placeholder="Hi {{ client.contact_name }}, please find your latest intelligence report attached..." class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand resize-none"></textarea>
-            </div>
-            <div class="flex items-center gap-2 mb-5">
-                <input type="checkbox" name="attach_pdf" id="attach_pdf" value="1" checked class="rounded">
-                <label for="attach_pdf" class="text-sm text-gray-600">Include PDF + live report link</label>
+                <textarea name="note" rows="3" placeholder="Hi {{ client.contact_name }}, please find your latest intelligence report attached..." class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand resize-none"></textarea>
             </div>
             <div class="flex gap-3">
                 <button type="submit" class="flex-1 bg-brand text-white py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition">Send Email</button>

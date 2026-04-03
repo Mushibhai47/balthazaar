@@ -71,7 +71,7 @@ COLLECTORS_CONFIG = [
 ]
 
 
-def send_report_email(report, client, query, report_data, note=''):
+def send_report_email(report, client, query, report_data, note='', extra_recipients=None):
     """Send report completion email to the client contact"""
     smtp_host = os.environ.get('SMTP_HOST', '')
     smtp_user = os.environ.get('SMTP_USER', '')
@@ -99,6 +99,12 @@ def send_report_email(report, client, query, report_data, note=''):
         return
     to_email = client.contact_email
     to_name = client.contact_name
+    # Additional recipients (can include dozens of emails)
+    stored = client.get_report_recipients() if hasattr(client, 'get_report_recipients') else []
+    one_off = extra_recipients or []
+    all_recipients = list({to_email} | set(stored) | set(one_off))  # deduplicate
+    # Always BCC Balthazaar
+    bcc_email = os.environ.get('BALTHAZAAR_EMAIL', 'hello@balthazaar.net')
 
     meta = report_data.get('metadata', {})
     succeeded = len(meta.get('sources_succeeded', []))
@@ -153,7 +159,7 @@ def send_report_email(report, client, query, report_data, note=''):
         <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Avg CPC</div>
       </div>
       <div style="flex:1;background:#f0f9ff;border-radius:12px;padding:16px;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:#0284c7">{succeeded}/13</div>
+        <div style="font-size:28px;font-weight:700;color:#0284c7">{succeeded}/15</div>
         <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Sources</div>
       </div>
     </div>
@@ -178,25 +184,158 @@ def send_report_email(report, client, query, report_data, note=''):
         msg['Subject'] = f"[{client.name}] Intelligence Report Ready — {date_str}"
         msg['From'] = f"Balthazaar Intelligence <{smtp_from}>"
         msg['To'] = f"{to_name} <{to_email}>"
+        if len(all_recipients) > 1:
+            msg['CC'] = ', '.join(r for r in all_recipients if r != to_email)
+        msg['Bcc'] = bcc_email
         msg.attach(MIMEText(html, 'html'))
+        send_to = list(set(all_recipients + [bcc_email]))
         with smtplib.SMTP(smtp_host, smtp_port) as server:
             server.ehlo()
             server.starttls()
             server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_from, [to_email], msg.as_string())
+            server.sendmail(smtp_from, send_to, msg.as_string())
         logger.info(f"Report email sent to {to_email}")
     except Exception as e:
         logger.error(f"Failed to send report email: {e}")
 
 
-def run_report_sync(report_id: int):
+def send_new_client_notification(client, keywords, countries):
+    """Send notification to hello@balthazaar.net when a new client form is submitted"""
+    smtp_host = os.environ.get('SMTP_HOST', '')
+    smtp_user = os.environ.get('SMTP_USER', '')
+    smtp_pass = os.environ.get('SMTP_PASSWORD', '')
+    smtp_port = int(os.environ.get('SMTP_PORT', 587))
+    smtp_from = os.environ.get('SMTP_FROM', smtp_user)
+    notify_to = os.environ.get('BALTHAZAAR_EMAIL', 'hello@balthazaar.net')
+
+    if not smtp_host or not smtp_user or not smtp_pass:
+        logger.info("SMTP not configured — skipping new client notification")
+        return
+
+    html = f"""<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8f7ff;padding:40px">
+<div style="max-width:560px;margin:0 auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(107,81,240,0.1)">
+  <div style="background:linear-gradient(135deg,#6B51F0,#8B5CF6);padding:28px 36px">
+    <h1 style="color:white;margin:0;font-size:20px">New Client Form Submitted</h1>
+    <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px">Balthazaar Intelligence Platform</p>
+  </div>
+  <div style="padding:28px 36px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px">
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600;width:140px">Client Name</td><td style="padding:8px 0;color:#1a1a2e;font-weight:700">{client.name}</td></tr>
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600">Website</td><td style="padding:8px 0;color:#6B51F0">{client.website}</td></tr>
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600">Contact</td><td style="padding:8px 0;color:#374151">{client.contact_name} &lt;{client.contact_email}&gt;</td></tr>
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600">Keywords</td><td style="padding:8px 0;color:#374151">{len(keywords)} keywords</td></tr>
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600">Countries</td><td style="padding:8px 0;color:#374151">{', '.join(countries)}</td></tr>
+      <tr><td style="padding:8px 0;color:#94a3b8;font-weight:600">Tier</td><td style="padding:8px 0;color:#374151">{client.subscription_tier}</td></tr>
+    </table>
+    <p style="font-size:12px;color:#94a3b8;margin:0">Log in to the dashboard to review and run the first report.</p>
+  </div>
+</div></body></html>"""
+
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"New Client: {client.name} — Form Submitted"
+        msg['From'] = f"Balthazaar Intelligence <{smtp_from}>"
+        msg['To'] = notify_to
+        msg.attach(MIMEText(html, 'html'))
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_from, [notify_to], msg.as_string())
+        logger.info(f"New client notification sent to {notify_to}")
+    except Exception as e:
+        logger.error(f"Failed to send new client notification: {e}")
+
+
+def run_report_sync(report_id: int, country_override: str = None):
     """Run report generation synchronously (used by threading fallback when Redis unavailable)"""
     app = create_app()
     with app.app_context():
-        _do_generate_report(report_id)
+        _do_generate_report(report_id, country_override=country_override)
 
 
-def _do_generate_report(report_id: int):
+def _compute_historical_trends(current_report, query, report_data: dict, country_override: str = None):
+    """
+    Look at the last 6 completed reports for this query (same country) and
+    compute a data-driven trend for each keyword based on actual volume history.
+    Overwrites the 'trend' field in every keyword source dict.
+    """
+    # Fetch up to 6 previous complete reports for same query + country
+    q = (Report.query
+         .filter(Report.query_id == query.id,
+                 Report.status == 'complete',
+                 Report.id != current_report.id))
+    if country_override:
+        q = q.filter(Report.country == country_override)
+    past_reports = q.order_by(Report.created_at.desc()).limit(5).all()
+
+    if not past_reports:
+        logger.info("No historical reports found — skipping trend computation")
+        return  # Not enough history yet
+
+    def _extract_volumes(rdata: dict) -> dict:
+        """Return {keyword: volume} from a report's data blob."""
+        kw_block = rdata.get('keywords', {})
+        # Prefer AI sources (most consistent volume data)
+        for src in ('openai', 'google_gemini', 'ubersuggest', 'google_ads'):
+            src_data = kw_block.get(src, {})
+            if isinstance(src_data, dict) and src_data:
+                return {k: v.get('search_volume', 0) for k, v in src_data.items() if isinstance(v, dict)}
+        return {}
+
+    # Build time series: newest first (index 0 = most recent past, index 4 = oldest)
+    history = []
+    for r in past_reports:
+        try:
+            rdata = json.loads(r.data) if r.data else {}
+            history.append(_extract_volumes(rdata))
+        except Exception:
+            history.append({})
+
+    current_volumes = _extract_volumes(report_data)
+
+    for keyword, cur_vol in current_volumes.items():
+        if cur_vol == 0:
+            continue
+        # Collect all available volume points (current + up to 5 past), newest first
+        series = [cur_vol] + [h.get(keyword, 0) for h in history]
+        series = [v for v in series if v > 0]  # drop zeros
+
+        if len(series) < 2:
+            continue  # Not enough data points
+
+        # Linear trend: compare average of first half vs average of second half
+        mid = len(series) // 2
+        recent_avg = sum(series[:mid]) / mid
+        older_avg = sum(series[mid:]) / (len(series) - mid)
+
+        if older_avg == 0:
+            continue
+
+        change_pct = (recent_avg - older_avg) / older_avg * 100
+
+        if change_pct > 8:
+            trend = 'rising'
+        elif change_pct < -8:
+            trend = 'declining'
+        else:
+            trend = 'stable'
+
+        # Overwrite trend in every keyword source that has this keyword
+        kw_block = report_data.get('keywords', {})
+        for src_name, src_data in kw_block.items():
+            if isinstance(src_data, dict) and keyword in src_data:
+                if isinstance(src_data[keyword], dict):
+                    src_data[keyword]['trend'] = trend
+                    src_data[keyword]['trend_pct'] = round(change_pct, 1)
+                    src_data[keyword]['trend_periods'] = len(series)
+
+    periods_used = len(past_reports) + 1  # past + current
+    report_data["metadata"]["trend_periods_used"] = periods_used
+    logger.info(f"Historical trend computed from {len(past_reports)} past report(s) ({periods_used} total periods)")
+
+
+def _do_generate_report(report_id: int, country_override: str = None):
     """Core report generation logic — called by both Celery task and thread fallback"""
     try:
             report = db.session.get(Report, report_id)
@@ -213,7 +352,9 @@ def _do_generate_report(report_id: int):
                 return {"error": "Query not found"}
 
             keywords = query.get_keywords()
-            countries = query.get_countries()
+            all_countries = query.get_countries()
+            # Use only the specific country for this report, if set
+            countries = [country_override] if country_override else all_countries
             client = query.client
 
             logger.info(f"Generating report for {len(keywords)} keywords across {len(countries)} countries")
@@ -238,6 +379,8 @@ def _do_generate_report(report_id: int):
                 "metadata": {
                     "collected_at": datetime.utcnow().isoformat(),
                     "client_name": client.name,
+                    "country": country_override,
+                    "countries": countries,
                     "sources_succeeded": [],
                     "sources_failed": [],
                     "errors": {},
@@ -293,6 +436,12 @@ def _do_generate_report(report_id: int):
                     db.session.commit()
 
             if report_data["metadata"]["sources_succeeded"]:
+                # Compute data-driven 6-period trend before finalising
+                try:
+                    _compute_historical_trends(report, query, report_data, country_override)
+                except Exception as e:
+                    logger.warning(f"Historical trend computation failed (non-fatal): {e}")
+
                 report.status = "complete"
                 report.generated_at = datetime.utcnow()
                 logger.info(f"Report {report_id} complete — {len(report_data['metadata']['sources_succeeded'])} sources succeeded")
@@ -327,11 +476,11 @@ def _do_generate_report(report_id: int):
 
 
 @celery.task(bind=True, name="tasks.generate_keyword_report")
-def generate_keyword_report(self, report_id: int):
+def generate_keyword_report(self, report_id: int, country_override: str = None):
     """Celery task wrapper — delegates to core logic"""
     app = create_app()
     with app.app_context():
-        _do_generate_report(report_id)
+        _do_generate_report(report_id, country_override=country_override)
 
 
 @celery.task(name="tasks.run_scheduled_reports")
@@ -364,11 +513,23 @@ def run_scheduled_reports():
                 should_run = hours_since >= interval_hours
 
             if should_run:
-                report = Report(query_id=query.id, status="pending")
-                db.session.add(report)
-                db.session.commit()
-                generate_keyword_report.delay(report.id)
-                logger.info(f"Auto-triggered report for query {query.id} (client: {query.client.name})")
+                countries = query.get_countries()
+                if len(countries) > 1:
+                    # Create one report per country
+                    for country in countries:
+                        report = Report(query_id=query.id, status="pending", country=country)
+                        db.session.add(report)
+                        db.session.flush()
+                        db.session.commit()
+                        generate_keyword_report.delay(report.id, country)
+                    logger.info(f"Auto-triggered {len(countries)} country reports for query {query.id} (client: {query.client.name})")
+                else:
+                    country = countries[0] if countries else None
+                    report = Report(query_id=query.id, status="pending", country=country)
+                    db.session.add(report)
+                    db.session.commit()
+                    generate_keyword_report.delay(report.id, country)
+                    logger.info(f"Auto-triggered report for query {query.id} (client: {query.client.name})")
                 triggered += 1
 
         logger.info(f"Scheduled reports check complete — {triggered} reports triggered")

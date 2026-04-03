@@ -87,26 +87,42 @@ class YouTubeCollector(BaseKeywordCollector):
         channel_id = None
 
         # Try to extract channel ID from URL
+        import re as _re
         if youtube_url:
-            # Handle @handle format
-            handle_match = re.search(r'@([\w-]+)', youtube_url) if hasattr(__import__('re'), 'search') else None
-            channel_match = re.search(r'channel/(UC[\w-]+)', youtube_url) if youtube_url else None
-
-            import re as _re
-            handle_match = _re.search(r'@([\w-]+)', youtube_url)
             channel_match = _re.search(r'channel/(UC[\w-]+)', youtube_url)
+            handle_match = _re.search(r'@([\w.-]+)', youtube_url)
+            user_match = _re.search(r'/user/([\w.-]+)', youtube_url)
 
             if channel_match:
                 channel_id = channel_match.group(1)
             elif handle_match:
-                # Search by handle
                 handle = handle_match.group(1)
+                # Use forHandle API (most accurate for @handle URLs)
                 try:
-                    search_resp = self.youtube.search().list(
-                        q=handle, part='snippet', type='channel', maxResults=1
+                    ch_resp = self.youtube.channels().list(
+                        forHandle=f'@{handle}', part='id'
                     ).execute()
-                    if search_resp.get('items'):
-                        channel_id = search_resp['items'][0]['snippet']['channelId']
+                    if ch_resp.get('items'):
+                        channel_id = ch_resp['items'][0]['id']
+                except Exception:
+                    pass
+                # Fallback: search by handle text
+                if not channel_id:
+                    try:
+                        search_resp = self.youtube.search().list(
+                            q=handle, part='snippet', type='channel', maxResults=1
+                        ).execute()
+                        if search_resp.get('items'):
+                            channel_id = search_resp['items'][0]['snippet']['channelId']
+                    except Exception:
+                        pass
+            elif user_match:
+                try:
+                    ch_resp = self.youtube.channels().list(
+                        forUsername=user_match.group(1), part='id'
+                    ).execute()
+                    if ch_resp.get('items'):
+                        channel_id = ch_resp['items'][0]['id']
                 except Exception:
                     pass
 
