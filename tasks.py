@@ -261,7 +261,7 @@ def _compute_historical_trends(current_report, query, report_data: dict, country
     Overwrites the 'trend' field in every keyword source dict.
     """
     # Fetch up to 6 previous complete reports for same query + country
-    q = (Report.query
+    q = (db.session.query(Report)
          .filter(Report.query_id == query.id,
                  Report.status == 'complete',
                  Report.id != current_report.id))
