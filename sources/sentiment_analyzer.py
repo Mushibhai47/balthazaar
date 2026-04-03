@@ -21,6 +21,12 @@ class SentimentCollector(BaseKeywordCollector):
         self.client_name = credentials.get('_client_name', '')
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
+        # Store country for use in news fetching
+        from sources.google_news import COUNTRY_LOCALE_MAP
+        country = countries[0] if countries else 'United States'
+        locale = COUNTRY_LOCALE_MAP.get(country, ('en-US', 'US', 'US:en'))
+        self._hl, self._gl, self._ceid = locale
+
         results = {}
 
         try:
@@ -98,7 +104,7 @@ class SentimentCollector(BaseKeywordCollector):
             import feedparser
             import urllib.parse
             query = urllib.parse.quote(f'"{brand_name}"')
-            url = f"https://news.google.com/rss/search?q={query}&hl=en&gl=US&ceid=US:en"
+            url = f"https://news.google.com/rss/search?q={query}&hl={getattr(self, '_hl', 'en-US')}&gl={getattr(self, '_gl', 'US')}&ceid={getattr(self, '_ceid', 'US:en')}"
             feed = feedparser.parse(url)
             texts = []
             for entry in feed.entries[:15]:

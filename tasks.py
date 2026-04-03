@@ -247,14 +247,14 @@ def send_new_client_notification(client, keywords, countries):
         logger.error(f"Failed to send new client notification: {e}")
 
 
-def run_report_sync(report_id: int):
+def run_report_sync(report_id: int, country_override: str = None):
     """Run report generation synchronously (used by threading fallback when Redis unavailable)"""
     app = create_app()
     with app.app_context():
-        _do_generate_report(report_id)
+        _do_generate_report(report_id, country_override=country_override)
 
 
-def _do_generate_report(report_id: int):
+def _do_generate_report(report_id: int, country_override: str = None):
     """Core report generation logic — called by both Celery task and thread fallback"""
     try:
             report = db.session.get(Report, report_id)
@@ -271,7 +271,9 @@ def _do_generate_report(report_id: int):
                 return {"error": "Query not found"}
 
             keywords = query.get_keywords()
-            countries = query.get_countries()
+            all_countries = query.get_countries()
+            # Use only the specific country for this report, if set
+            countries = [country_override] if country_override else all_countries
             client = query.client
 
             logger.info(f"Generating report for {len(keywords)} keywords across {len(countries)} countries")
@@ -296,6 +298,8 @@ def _do_generate_report(report_id: int):
                 "metadata": {
                     "collected_at": datetime.utcnow().isoformat(),
                     "client_name": client.name,
+                    "country": country_override,
+                    "countries": countries,
                     "sources_succeeded": [],
                     "sources_failed": [],
                     "errors": {},
@@ -385,11 +389,11 @@ def _do_generate_report(report_id: int):
 
 
 @celery.task(bind=True, name="tasks.generate_keyword_report")
-def generate_keyword_report(self, report_id: int):
+def generate_keyword_report(self, report_id: int, country_override: str = None):
     """Celery task wrapper — delegates to core logic"""
     app = create_app()
     with app.app_context():
-        _do_generate_report(report_id)
+        _do_generate_report(report_id, country_override=country_override)
 
 
 @celery.task(name="tasks.run_scheduled_reports")
@@ -422,11 +426,23 @@ def run_scheduled_reports():
                 should_run = hours_since >= interval_hours
 
             if should_run:
-                report = Report(query_id=query.id, status="pending")
-                db.session.add(report)
-                db.session.commit()
-                generate_keyword_report.delay(report.id)
-                logger.info(f"Auto-triggered report for query {query.id} (client: {query.client.name})")
+                countries = query.get_countries()
+                if len(countries) > 1:
+                    # Create one report per country
+                    for country in countries:
+                        report = Report(query_id=query.id, status="pending", country=country)
+                        db.session.add(report)
+                        db.session.flush()
+                        db.session.commit()
+                        generate_keyword_report.delay(report.id, country)
+                    logger.info(f"Auto-triggered {len(countries)} country reports for query {query.id} (client: {query.client.name})")
+                else:
+                    country = countries[0] if countries else None
+                    report = Report(query_id=query.id, status="pending", country=country)
+                    db.session.add(report)
+                    db.session.commit()
+                    generate_keyword_report.delay(report.id, country)
+                    logger.info(f"Auto-triggered report for query {query.id} (client: {query.client.name})")
                 triggered += 1
 
         logger.info(f"Scheduled reports check complete — {triggered} reports triggered")

@@ -78,7 +78,7 @@
         <div class="meta">
             Competitive Intelligence Report &nbsp;·&nbsp; Report #{{ report.id }}<br>
             {% if report.generated_at %}{{ report.generated_at.strftime('%B %d, %Y') }}{% else %}{{ report.created_at.strftime('%B %d, %Y') }}{% endif %}
-            &nbsp;·&nbsp; {{ keywords|length }} Keywords &nbsp;·&nbsp; {{ query.get_countries()|join(', ') }}
+            &nbsp;·&nbsp; {{ keywords|length }} Keywords &nbsp;·&nbsp; {% if report.country %}{{ report.country }}{% else %}{{ query.get_countries()|join(', ') }}{% endif %}
         </div>
         {% if competitors %}
         <div class="competitors">Competitors tracked: {{ competitors | map(attribute='name') | join(' · ') }}</div>

@@ -62,6 +62,13 @@ with app.app_context():
             conn.commit()
     except Exception:
         pass  # Column already exists
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE reports ADD COLUMN country VARCHAR(100)"))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists
 
 
 # --- Dashboard ---
@@ -267,16 +274,27 @@ def run_report(query_id):
     from tasks import run_report_sync
 
     query = db.get_or_404(Query, query_id)
+    countries = query.get_countries()
 
-    # Create new report
-    report = Report(query_id=query.id, status="pending")
-    db.session.add(report)
-    db.session.commit()
-
-    # Run in background thread (no Redis/Celery required)
-    t = threading.Thread(target=run_report_sync, args=(report.id,), daemon=True)
-    t.start()
-    flash("Report generation started! Data is being collected from all sources.", "success")
+    if len(countries) > 1:
+        # Create one report per country and run each in its own thread
+        for country in countries:
+            report = Report(query_id=query.id, status="pending", country=country)
+            db.session.add(report)
+            db.session.flush()  # get report.id before commit
+            db.session.commit()
+            t = threading.Thread(target=run_report_sync, args=(report.id, country), daemon=True)
+            t.start()
+        flash(f"Report generation started for {len(countries)} countries! Data is being collected from all sources.", "success")
+    else:
+        # Single country (or none set) — run one combined report
+        country = countries[0] if countries else None
+        report = Report(query_id=query.id, status="pending", country=country)
+        db.session.add(report)
+        db.session.commit()
+        t = threading.Thread(target=run_report_sync, args=(report.id, country), daemon=True)
+        t.start()
+        flash("Report generation started! Data is being collected from all sources.", "success")
 
     return redirect(url_for("view_client", client_id=query.client_id))
 

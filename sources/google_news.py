@@ -12,6 +12,22 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+COUNTRY_LOCALE_MAP = {
+    'Australia': ('en-AU', 'AU', 'AU:en'),
+    'Singapore': ('en-SG', 'SG', 'SG:en'),
+    'United Kingdom': ('en-GB', 'GB', 'GB:en'),
+    'United States': ('en-US', 'US', 'US:en'),
+    'Canada': ('en-CA', 'CA', 'CA:en'),
+    'New Zealand': ('en-NZ', 'NZ', 'NZ:en'),
+    'India': ('en-IN', 'IN', 'IN:en'),
+    'South Africa': ('en-ZA', 'ZA', 'ZA:en'),
+    'Germany': ('de', 'DE', 'DE:de'),
+    'France': ('fr', 'FR', 'FR:fr'),
+    'Spain': ('es', 'ES', 'ES:es'),
+    'Brazil': ('pt-BR', 'BR', 'BR:pt-419'),
+}
+
+
 class GoogleNewsCollector(BaseKeywordCollector):
     """Collector for Google News brand and competitor monitoring"""
 
@@ -23,6 +39,11 @@ class GoogleNewsCollector(BaseKeywordCollector):
         self.competitors = credentials.get('_competitors', [])
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
+        # Determine locale from first country in list
+        country = countries[0] if countries else 'United States'
+        locale = COUNTRY_LOCALE_MAP.get(country, ('en-US', 'US', 'US:en'))
+        self._hl, self._gl, self._ceid = locale
+
         results = {}
 
         # Top 5 keywords in news
@@ -64,7 +85,7 @@ class GoogleNewsCollector(BaseKeywordCollector):
         try:
             import feedparser
             encoded = urllib.parse.quote(query)
-            url = f"{self.BASE_URL}?q={encoded}&hl=en-US&gl=US&ceid=US:en"
+            url = f"{self.BASE_URL}?q={encoded}&hl={getattr(self, '_hl', 'en-US')}&gl={getattr(self, '_gl', 'US')}&ceid={getattr(self, '_ceid', 'US:en')}"
             feed = feedparser.parse(url)
 
             articles = []

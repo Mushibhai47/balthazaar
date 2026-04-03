@@ -40,8 +40,9 @@
                     <span class="font-medium text-gray-700">{{ client.name }}</span> ·
                     {% if report.generated_at %}{{ report.generated_at.strftime('%b %d, %Y at %H:%M UTC') }}{% else %}{{ report.created_at.strftime('%b %d, %Y') }}{% endif %}
                     · <strong>{{ keywords|length }}</strong> keywords
-                    {% set countries = query.get_countries() %}
-                    {% if countries %} · {{ countries|join(', ') }}{% endif %}
+                    {% if report.country %}
+                    · <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium">🌏 {{ report.country }}</span>
+                    {% else %}{% set countries = query.get_countries() %}{% if countries %} · {{ countries|join(', ') }}{% endif %}{% endif %}
                     {% if query.period_start and query.period_end %} · {{ query.period_start.strftime('%d %b %Y') }} – {{ query.period_end.strftime('%d %b %Y') }}{% endif %}
                 </p>
                 {% if competitors %}

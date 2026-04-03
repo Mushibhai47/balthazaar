@@ -196,7 +196,7 @@
                 <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Reports</span>
                 {% for report in query.reports | sort(attribute='created_at', reverse=True) %}
                 <div class="flex items-center justify-between py-2 text-xs">
-                    <span class="text-gray-600">{{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                    <span class="text-gray-600">{{ report.created_at.strftime('%Y-%m-%d %H:%M') }}{% if report.country %} <span class="ml-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded text-[10px] font-medium">{{ report.country }}</span>{% endif %}</span>
                     <div class="flex items-center gap-2">
                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-medium
                             {% if report.status == 'complete' %}bg-emerald-50 text-emerald-700 border border-emerald-200
