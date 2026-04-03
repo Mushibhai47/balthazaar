@@ -254,6 +254,87 @@ def run_report_sync(report_id: int, country_override: str = None):
         _do_generate_report(report_id, country_override=country_override)
 
 
+def _compute_historical_trends(current_report, query, report_data: dict, country_override: str = None):
+    """
+    Look at the last 6 completed reports for this query (same country) and
+    compute a data-driven trend for each keyword based on actual volume history.
+    Overwrites the 'trend' field in every keyword source dict.
+    """
+    # Fetch up to 6 previous complete reports for same query + country
+    q = (Report.query
+         .filter(Report.query_id == query.id,
+                 Report.status == 'complete',
+                 Report.id != current_report.id))
+    if country_override:
+        q = q.filter(Report.country == country_override)
+    past_reports = q.order_by(Report.created_at.desc()).limit(5).all()
+
+    if not past_reports:
+        logger.info("No historical reports found — skipping trend computation")
+        return  # Not enough history yet
+
+    def _extract_volumes(rdata: dict) -> dict:
+        """Return {keyword: volume} from a report's data blob."""
+        kw_block = rdata.get('keywords', {})
+        # Prefer AI sources (most consistent volume data)
+        for src in ('openai', 'google_gemini', 'ubersuggest', 'google_ads'):
+            src_data = kw_block.get(src, {})
+            if isinstance(src_data, dict) and src_data:
+                return {k: v.get('search_volume', 0) for k, v in src_data.items() if isinstance(v, dict)}
+        return {}
+
+    # Build time series: newest first (index 0 = most recent past, index 4 = oldest)
+    history = []
+    for r in past_reports:
+        try:
+            rdata = json.loads(r.data) if r.data else {}
+            history.append(_extract_volumes(rdata))
+        except Exception:
+            history.append({})
+
+    current_volumes = _extract_volumes(report_data)
+
+    for keyword, cur_vol in current_volumes.items():
+        if cur_vol == 0:
+            continue
+        # Collect all available volume points (current + up to 5 past), newest first
+        series = [cur_vol] + [h.get(keyword, 0) for h in history]
+        series = [v for v in series if v > 0]  # drop zeros
+
+        if len(series) < 2:
+            continue  # Not enough data points
+
+        # Linear trend: compare average of first half vs average of second half
+        mid = len(series) // 2
+        recent_avg = sum(series[:mid]) / mid
+        older_avg = sum(series[mid:]) / (len(series) - mid)
+
+        if older_avg == 0:
+            continue
+
+        change_pct = (recent_avg - older_avg) / older_avg * 100
+
+        if change_pct > 8:
+            trend = 'rising'
+        elif change_pct < -8:
+            trend = 'declining'
+        else:
+            trend = 'stable'
+
+        # Overwrite trend in every keyword source that has this keyword
+        kw_block = report_data.get('keywords', {})
+        for src_name, src_data in kw_block.items():
+            if isinstance(src_data, dict) and keyword in src_data:
+                if isinstance(src_data[keyword], dict):
+                    src_data[keyword]['trend'] = trend
+                    src_data[keyword]['trend_pct'] = round(change_pct, 1)
+                    src_data[keyword]['trend_periods'] = len(series)
+
+    periods_used = len(past_reports) + 1  # past + current
+    report_data["metadata"]["trend_periods_used"] = periods_used
+    logger.info(f"Historical trend computed from {len(past_reports)} past report(s) ({periods_used} total periods)")
+
+
 def _do_generate_report(report_id: int, country_override: str = None):
     """Core report generation logic — called by both Celery task and thread fallback"""
     try:
@@ -355,6 +436,12 @@ def _do_generate_report(report_id: int, country_override: str = None):
                     db.session.commit()
 
             if report_data["metadata"]["sources_succeeded"]:
+                # Compute data-driven 6-period trend before finalising
+                try:
+                    _compute_historical_trends(report, query, report_data, country_override)
+                except Exception as e:
+                    logger.warning(f"Historical trend computation failed (non-fatal): {e}")
+
                 report.status = "complete"
                 report.generated_at = datetime.utcnow()
                 logger.info(f"Report {report_id} complete — {len(report_data['metadata']['sources_succeeded'])} sources succeeded")

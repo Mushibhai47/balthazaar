@@ -229,6 +229,8 @@
             <span class="material-symbols-outlined text-accent text-[28px] mb-1">trending_up</span>
             <p class="text-2xl font-bold text-gray-900">{{ rising_count }}</p>
             <p class="text-xs text-gray-400">Rising Keywords</p>
+            {% set trend_periods = metadata.get('trend_periods_used') %}
+            {% if trend_periods %}<p class="text-[10px] text-brand mt-0.5">{{ trend_periods }}-period data</p>{% endif %}
         </div>
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-purple-500 text-[28px] mb-1">local_atm</span>
@@ -406,8 +408,12 @@
                         </td>
                         <td class="py-3 px-3 text-center font-bold text-base">
                             {% set trend = kd.get('trend', '') %}
-                            {% if trend == 'rising' %}<span class="text-emerald-500" title="Rising">↑</span>
-                            {% elif trend == 'declining' %}<span class="text-red-400" title="Declining">↓</span>
+                            {% set trend_pct = kd.get('trend_pct') %}
+                            {% set trend_periods = kd.get('trend_periods') %}
+                            {% if trend == 'rising' %}
+                            <span class="text-emerald-500" title="Rising{% if trend_pct %} {{ '%+.1f'|format(trend_pct) }}% over {{ trend_periods }} periods{% endif %}">↑{% if trend_pct %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(trend_pct) }}%</span>{% endif %}</span>
+                            {% elif trend == 'declining' %}
+                            <span class="text-red-400" title="Declining{% if trend_pct %} {{ '%+.1f'|format(trend_pct) }}% over {{ trend_periods }} periods{% endif %}">↓{% if trend_pct %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(trend_pct) }}%</span>{% endif %}</span>
                             {% elif trend == 'stable' %}<span class="text-amber-400" title="Stable">—</span>
                             {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
                         </td>

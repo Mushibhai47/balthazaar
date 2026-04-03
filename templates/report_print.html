@@ -224,9 +224,9 @@
                         {% else %}—{% endif %}
                     </td>
                     <td style="text-align:right;font-family:monospace">{% if kd.get('estimated_cpc', 0) > 0 %}${{ '%.2f'|format(kd.get('estimated_cpc', 0)) }}{% else %}—{% endif %}</td>
-                    <td>{% set t = kd.get('trend', '') %}
-                        {% if t == 'rising' %}<span class="trend-up">↑</span>
-                        {% elif t == 'declining' %}<span class="trend-down">↓</span>
+                    <td>{% set t = kd.get('trend', '') %}{% set tp = kd.get('trend_pct') %}
+                        {% if t == 'rising' %}<span class="trend-up">↑{% if tp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
+                        {% elif t == 'declining' %}<span class="trend-down">↓{% if tp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
                         {% else %}<span class="trend-stable">—</span>{% endif %}
                     </td>
                     <td style="max-width:220px;color:#64748b">{{ (kd.get('insight', '') or '')[:100] }}</td>
