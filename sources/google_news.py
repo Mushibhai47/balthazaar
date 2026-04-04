@@ -55,10 +55,10 @@ class GoogleNewsCollector(BaseKeywordCollector):
             results[f"_brand_{self.client_name}"] = self._fetch_news(self.client_name, label="client_brand")
 
         # Competitor brand news
-        for comp in self.competitors[:3]:
+        for idx, comp in enumerate(self.competitors[:3]):
             name = comp.get('name', '')
             if name:
-                results[f"_competitor_{name}"] = self._fetch_news(name, label="competitor")
+                results[f"_competitor_{idx}_{name}"] = self._fetch_news(name, label="competitor")
 
         # Brand-based news (client + competitors)
         brands = []
@@ -88,14 +88,15 @@ class GoogleNewsCollector(BaseKeywordCollector):
             url = f"{self.BASE_URL}?q={encoded}&hl={getattr(self, '_hl', 'en-US')}&gl={getattr(self, '_gl', 'US')}&ceid={getattr(self, '_ceid', 'US:en')}"
             feed = feedparser.parse(url)
 
+            import html as html_mod
             articles = []
             for entry in feed.entries[:10]:
                 articles.append({
-                    'title': entry.get('title', ''),
+                    'title': html_mod.unescape(entry.get('title', '')),
                     'link': entry.get('link', ''),
                     'published': entry.get('published', ''),
-                    'source': entry.get('source', {}).get('title', 'Unknown'),
-                    'summary': entry.get('summary', '')[:300] if entry.get('summary') else ''
+                    'source': html_mod.unescape(entry.get('source', {}).get('title', 'Unknown')),
+                    'summary': html_mod.unescape(entry.get('summary', '')[:300]) if entry.get('summary') else ''
                 })
 
             return {

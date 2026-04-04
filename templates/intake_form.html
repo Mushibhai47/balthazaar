@@ -16,7 +16,7 @@
     <!-- Progress Bar -->
     <div class="mb-8">
         <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-semibold text-brand" id="progressLabel">Section 1 of 6</span>
+            <span class="text-xs font-semibold text-brand" id="progressLabel">Step 1 of 6</span>
             <span class="text-xs text-gray-400" id="progressPercent">0%</span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-1.5">
@@ -245,7 +245,7 @@
                 </div>
                 <h2 class="text-lg font-semibold text-gray-800">Country / Countries</h2>
             </div>
-            <p class="text-sm text-gray-500 mb-3">Each country generates a separate report section.</p>
+            <p class="text-sm text-gray-500 mb-3">Each country generates a separate report.</p>
             <div id="countries">
                 <div class="flex gap-2 mb-2">
                     <select name="countries[]" class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition">
@@ -325,8 +325,8 @@
                 <input type="checkbox" name="confirm_accuracy" required class="w-5 h-5 mt-0.5 text-brand rounded-md focus:ring-brand border-gray-300">
                 <span class="text-sm text-gray-600 leading-relaxed">I confirm that all information provided is accurate and understand that pricing may deviate based on the scope of data tracked. Subscriptions are auto-renewable and can be cancelled within 31 days advance notice.</span>
             </label>
-            {% set nda_url = config.get('NDA_URL', '') if config is defined else '' %}
-            {% set contract_url = config.get('CONTRACT_URL', '') if config is defined else '' %}
+            {% set nda_url = links.get('nda_url', '') if links is defined else '' %}
+            {% set contract_url = links.get('contract_url', '') if links is defined else '' %}
             <div class="flex gap-4 pt-3 border-t border-gray-100">
                 <a href="{{ nda_url or '#' }}" target="_blank" class="inline-flex items-center gap-1.5 text-sm text-brand hover:underline {% if not nda_url %}opacity-40 pointer-events-none{% endif %}">
                     <span class="material-symbols-outlined text-[16px]">description</span> Non-Disclosure Agreement (NDA)

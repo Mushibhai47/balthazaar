@@ -34,7 +34,7 @@ class LinkedInJobsCollector(BaseKeywordCollector):
         if self.client_name:
             results['_client'] = self._get_jobs(self.client_name, country)
 
-        for comp in self.competitors[:5]:
+        for idx, comp in enumerate(self.competitors[:5]):
             name = comp.get('name', '')
             website = comp.get('website', '')
             if name:
@@ -43,7 +43,7 @@ class LinkedInJobsCollector(BaseKeywordCollector):
                 website_jobs = self._get_website_jobs(name, website)
                 if website_jobs.get('jobs_found', 0) > 0:
                     job_data['website_jobs'] = website_jobs
-                results[f"_competitor_{name}"] = job_data
+                results[f"_competitor_{idx}_{name}"] = job_data
 
         if not results:
             results['_info'] = {'message': 'No companies configured', 'source': 'linkedin_jobs'}

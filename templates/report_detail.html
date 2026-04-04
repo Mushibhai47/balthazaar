@@ -256,6 +256,7 @@
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Organic For Period</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Paid For Period</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Total For Period</th>
+                        <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Trend</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Domain Score</th>
                     </tr>
                 </thead>
@@ -273,6 +274,13 @@
                         <td class="py-3 px-3 text-right font-mono text-xs text-emerald-600">{{ '{:,}'.format(td.get('organic_monthly', 0)) }}</td>
                         <td class="py-3 px-3 text-right font-mono text-xs text-blue-600">{{ '{:,}'.format(td.get('paid_monthly', 0)) }}</td>
                         <td class="py-3 px-3 text-right font-mono text-xs text-gray-700 font-semibold">{{ '{:,}'.format(td.get('total_monthly', 0)) }}</td>
+                        <td class="py-3 px-3 text-center font-bold text-base">
+                            {% set tt = td.get('trend', '') %}{% set tp = td.get('trend_pct') %}
+                            {% if tt == 'rising' %}<span class="text-emerald-500" title="Rising{% if tp %} {{ '%+.1f'|format(tp) }}%{% endif %}">↑{% if tp %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
+                            {% elif tt == 'declining' %}<span class="text-red-400" title="Declining{% if tp %} {{ '%+.1f'|format(tp) }}%{% endif %}">↓{% if tp %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
+                            {% elif tt == 'stable' %}<span class="text-amber-400">—</span>
+                            {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
+                        </td>
                         <td class="py-3 px-3 text-right">
                             <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold
                                 {% if td.get('domain_score', 0) >= 70 %}bg-emerald-50 text-emerald-700
@@ -395,7 +403,7 @@
                         <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Trend</th>
                         <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Competition</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">CPC</th>
-                        <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase" style="min-width:200px">Insight</th>
+                        <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase" style="min-width:280px">Insight</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -427,7 +435,7 @@
                         <td class="py-3 px-3 text-right font-mono text-xs text-gray-600">
                             {% if kd.get('estimated_cpc', 0) > 0 %}${{ '%.2f'|format(kd.get('estimated_cpc', 0)) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                         </td>
-                        <td class="py-3 px-3 text-gray-500 text-xs" style="min-width:200px" title="{{ kd.get('insight', '') }}">{{ (kd.get('insight', '') or '')[:120] }}{% if (kd.get('insight', '') or '')|length > 120 %}…{% endif %}</td>
+                        <td class="py-3 px-3 text-gray-500 text-xs" style="min-width:280px;max-width:360px;white-space:normal" title="{{ kd.get('insight', '') }}">{{ (kd.get('insight', '') or '')[:180] }}{% if (kd.get('insight', '') or '')|length > 180 %}… <button type="button" class="text-brand underline text-[10px]" onclick="this.previousSibling.textContent='{{ (kd.get('insight', '') or '')|replace("'","\\'") }}';this.remove()">more</button>{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -553,12 +561,19 @@
         {% for key, yd in yt_data.items() %}{% if yd.get('is_channel') %}{% set has_channels.val = true %}{% endif %}{% endfor %}
         {% if has_channels.val %}
         <div class="mt-6 pt-6 border-t border-gray-100">
-            <h3 class="text-sm font-semibold text-gray-700 mb-4">Competitor Channel Activity — Top 5 by Engagement Rate</h3>
-            {% set channel_list = [] %}
+            <h3 class="text-sm font-semibold text-gray-700 mb-1">Competitor Channel Activity — Top 5 by Engagement Rate</h3>
+            <p class="text-xs text-gray-400 mb-4">Average engagement is calculated across all videos found, not just the 5 shown below.</p>
+            {# Client channel first, then competitors sorted by engagement rate desc #}
+            {% set client_channels = [] %}
+            {% set comp_channels = [] %}
             {% for key, yd in yt_data.items() %}
-                {% if yd.get('is_channel') and yd.get('videos') %}{% set _ = channel_list.append(yd) %}{% endif %}
+                {% if yd.get('is_channel') and yd.get('videos') %}
+                    {% if yd.get('is_client') %}{% set _ = client_channels.append(yd) %}
+                    {% else %}{% set _ = comp_channels.append(yd) %}{% endif %}
+                {% endif %}
             {% endfor %}
-            {% set channel_list = channel_list | sort(attribute='avg_engagement_rate', reverse=true) %}
+            {% set comp_channels = comp_channels | sort(attribute='avg_engagement_rate', reverse=true) %}
+            {% set channel_list = client_channels + comp_channels %}
             {% for yd in channel_list[:5] %}
             {% if true %}
             <div class="mb-5 pb-5 border-b border-gray-100 last:border-0">
@@ -621,7 +636,13 @@
                         {% if sd.get('brand_type') == 'client' %}🏢{% else %}🏬{% endif %}
                         {{ sd.get('brand_name', key) }}
                     </h3>
-                    <span class="text-xs text-gray-400">{{ sd.get('total_analyzed', 0) }} data points</span>
+                    <div class="flex items-center gap-2">
+                        {% set st = sd.get('sentiment_trend', '') %}{% set stp = sd.get('sentiment_trend_pct') %}
+                        {% if st == 'rising' %}<span class="text-emerald-500 font-bold text-sm" title="Positive sentiment trending up{% if stp %} {{ '%+.1f'|format(stp) }}%{% endif %}">↑{% if stp %}<span class="text-[9px] font-normal">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
+                        {% elif st == 'declining' %}<span class="text-red-400 font-bold text-sm" title="Positive sentiment trending down{% if stp %} {{ '%+.1f'|format(stp) }}%{% endif %}">↓{% if stp %}<span class="text-[9px] font-normal">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
+                        {% elif st == 'stable' %}<span class="text-amber-400 font-bold">—</span>{% endif %}
+                        <span class="text-xs text-gray-400">{{ sd.get('total_analyzed', 0) }} data points</span>
+                    </div>
                 </div>
                 <div class="flex gap-2">
                     <div class="flex-1 bg-emerald-50 rounded-lg p-2 text-center">
