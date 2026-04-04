@@ -20,31 +20,37 @@
         </div>
 
         <form method="POST" action="/clients/{{ client.id }}/edit">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Client Name <span class="text-red-400">*</span></label>
-                    <input type="text" name="client_name" value="{{ client.name }}" required
-                        class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Client Website <span class="text-red-400">*</span></label>
-                    <input type="url" name="client_website" value="{{ client.website }}" required
-                        class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Contact Name <span class="text-red-400">*</span></label>
-                    <input type="text" name="contact_name" value="{{ client.contact_name }}" required
-                        class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Contact Email <span class="text-red-400">*</span></label>
-                    <input type="email" name="contact_email" value="{{ client.contact_email }}" required
-                        class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition text-sm">
+
+            <!-- Client Info -->
+            <div class="mb-6">
+                <p class="text-xs font-semibold text-brand uppercase tracking-widest mb-3">Client Info</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Client Name <span class="text-red-400">*</span></label>
+                        <input type="text" name="client_name" value="{{ client.name }}" required
+                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Client Website <span class="text-red-400">*</span></label>
+                        <input type="url" name="client_website" value="{{ client.website }}" required
+                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Contact Name <span class="text-red-400">*</span></label>
+                        <input type="text" name="contact_name" value="{{ client.contact_name }}" required
+                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Contact Email <span class="text-red-400">*</span></label>
+                        <input type="email" name="contact_email" value="{{ client.contact_email }}" required
+                            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition text-sm">
+                    </div>
                 </div>
             </div>
 
+            <!-- Subscription Tier -->
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-3">Subscription Tier</label>
+                <p class="text-xs font-semibold text-brand uppercase tracking-widest mb-3">Subscription Tier</p>
                 <div class="grid grid-cols-3 gap-3">
                     {% for tier in tiers %}
                     <label class="relative cursor-pointer">
@@ -58,8 +64,78 @@
                 </div>
             </div>
 
+            {% if query %}
+            <!-- Keywords -->
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Report Recipients <span class="text-gray-400 font-normal text-xs">(in addition to primary contact)</span></label>
+                <p class="text-xs font-semibold text-brand uppercase tracking-widest mb-3">Keywords &amp; AI Prompts</p>
+                <textarea name="keywords" rows="6"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition resize-none font-mono"
+                    placeholder="yoga classes Singapore&#10;wellness studio near me">{{ query.get_keywords() | join('\n') }}</textarea>
+                <p class="text-xs text-gray-400 mt-1">One keyword or prompt per line. Changes apply to the next report run.</p>
+            </div>
+
+            <!-- Countries -->
+            <div class="mb-6">
+                <p class="text-xs font-semibold text-brand uppercase tracking-widest mb-3">Countries</p>
+                <div id="editCountries">
+                    {% for country in query.get_countries() %}
+                    <div class="flex gap-2 mb-2">
+                        <select name="countries[]" class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition bg-white">
+                            {% for c in countries %}
+                            <option value="{{ c }}" {% if c == country %}selected{% endif %}>{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" onclick="this.parentElement.remove()" class="px-3 py-2 text-red-400 hover:bg-red-50 rounded-xl transition text-sm">✕</button>
+                    </div>
+                    {% endfor %}
+                    {% if not query.get_countries() %}
+                    <div class="flex gap-2 mb-2">
+                        <select name="countries[]" class="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition bg-white">
+                            {% for c in countries %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+                        </select>
+                        <button type="button" onclick="this.parentElement.remove()" class="px-3 py-2 text-red-400 hover:bg-red-50 rounded-xl transition text-sm">✕</button>
+                    </div>
+                    {% endif %}
+                </div>
+                <button type="button" onclick="addEditCountry()" class="mt-2 text-xs text-brand hover:underline flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">add</span> Add another country
+                </button>
+            </div>
+
+            <!-- Competitors -->
+            {% if client.competitors %}
+            <div class="mb-6">
+                <p class="text-xs font-semibold text-brand uppercase tracking-widest mb-3">Competitors</p>
+                {% for comp in client.competitors %}
+                <div class="border border-gray-200 rounded-xl p-4 mb-3">
+                    <p class="text-xs font-semibold text-gray-500 mb-2">Competitor {{ loop.index }}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Name</label>
+                            <input type="text" name="comp_name_{{ comp.id }}" value="{{ comp.name }}"
+                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-200 outline-none transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Website</label>
+                            <input type="url" name="comp_website_{{ comp.id }}" value="{{ comp.website }}"
+                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-200 outline-none transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">YouTube URL</label>
+                            <input type="url" name="comp_youtube_{{ comp.id }}" value="{{ comp.youtube_url or '' }}"
+                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-200 outline-none transition">
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endif %}
+
+            <!-- Report Recipients -->
+            <div class="mb-6">
+                <p class="text-xs font-semibold text-brand uppercase tracking-widest mb-3">Report Recipients</p>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Additional Recipients <span class="text-gray-400 font-normal text-xs">(in addition to primary contact)</span></label>
                 <textarea name="report_recipients" rows="3"
                     class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition resize-none"
                     placeholder="colleague@company.com&#10;manager@company.com">{{ client.get_report_recipients() | join('\n') }}</textarea>
@@ -80,4 +156,17 @@
         </form>
     </div>
 </div>
+
+{% block scripts %}
+<script>
+function addEditCountry() {
+    const container = document.getElementById('editCountries');
+    const existing = container.querySelector('select[name="countries[]"]');
+    const div = document.createElement('div');
+    div.className = 'flex gap-2 mb-2';
+    div.innerHTML = existing.outerHTML.replace(' selected', '') + '<button type="button" onclick="this.parentElement.remove()" class="px-3 py-2 text-red-400 hover:bg-red-50 rounded-xl transition text-sm">✕</button>';
+    container.appendChild(div);
+}
+</script>
+{% endblock %}
 {% endblock %}

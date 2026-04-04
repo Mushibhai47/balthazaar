@@ -30,11 +30,11 @@ class WaybackMachineCollector(BaseKeywordCollector):
             results['_client'] = self._check_website(self.client_website, 'client')
 
         # Check competitor websites
-        for comp in self.competitors[:5]:
+        for idx, comp in enumerate(self.competitors[:5]):
             website = comp.get('website', '')
-            name = comp.get('name', website)
+            name = comp.get('name') or website  # fallback to URL if name is empty
             if website:
-                results[f"_competitor_{name}"] = self._check_website(website, 'competitor', name)
+                results[f"_competitor_{idx}_{name}"] = self._check_website(website, 'competitor', name)
 
         if not results:
             results['_info'] = {

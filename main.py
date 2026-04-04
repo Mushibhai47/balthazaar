@@ -87,12 +87,26 @@ def dashboard():
         recent_reports=recent_reports)
 
 
+def _get_links_config():
+    """Return NDA and contract URLs from DB or env vars."""
+    try:
+        cred = APICredential.query.filter_by(service_name='links').first()
+        if cred:
+            return cred.get_credentials()
+    except Exception:
+        pass
+    return {
+        'nda_url': os.environ.get('NDA_URL', ''),
+        'contract_url': os.environ.get('CONTRACT_URL', ''),
+    }
+
+
 # --- New Client + Intake Form ---
 @app.route("/clients/new", methods=["GET", "POST"])
 def new_client():
     if request.method == "GET":
         tiers = SubscriptionTier.query.filter_by(is_active=True).order_by(SubscriptionTier.sort_order).all()
-        return render_template("intake_form.html", countries=COUNTRIES, tiers=tiers)
+        return render_template("intake_form.html", countries=COUNTRIES, tiers=tiers, links=_get_links_config())
 
     # Parse form data
     client_name = request.form.get("client_name", "").strip()
@@ -211,9 +225,11 @@ def view_client(client_id):
 def edit_client(client_id):
     client = db.get_or_404(Client, client_id)
 
+    query = client.queries[0] if client.queries else None
+
     if request.method == "GET":
         tiers = SubscriptionTier.query.filter_by(is_active=True).order_by(SubscriptionTier.sort_order).all()
-        return render_template("edit_client.html", client=client, tiers=tiers)
+        return render_template("edit_client.html", client=client, tiers=tiers, query=query, countries=COUNTRIES)
 
     client.name = request.form.get("client_name", client.name).strip()
     client.website = request.form.get("client_website", client.website).strip()
@@ -223,6 +239,27 @@ def edit_client(client_id):
     recipients_raw = request.form.get("report_recipients", "")
     extra_emails = [e.strip() for e in recipients_raw.replace(',', '\n').split('\n') if e.strip() and '@' in e]
     client.set_report_recipients(extra_emails)
+
+    # Update query keywords and countries
+    if query:
+        keywords_raw = request.form.get("keywords", "")
+        new_keywords = [k.strip() for k in keywords_raw.splitlines() if k.strip()]
+        if new_keywords:
+            query.set_keywords(new_keywords)
+        new_countries = [c for c in request.form.getlist("countries[]") if c.strip()]
+        if new_countries:
+            query.set_countries(new_countries)
+
+    # Update competitor fields
+    for comp in client.competitors:
+        comp_name = request.form.get(f"comp_name_{comp.id}", "").strip()
+        comp_website = request.form.get(f"comp_website_{comp.id}", "").strip()
+        comp_youtube = request.form.get(f"comp_youtube_{comp.id}", "").strip()
+        if comp_name:
+            comp.name = comp_name
+        if comp_website:
+            comp.website = comp_website
+        comp.youtube_url = comp_youtube
 
     db.session.commit()
     flash(f"Client '{client.name}' updated.", "success")
@@ -353,7 +390,7 @@ def public_intake(token):
 
     if request.method == "GET":
         tiers = SubscriptionTier.query.filter_by(is_active=True).order_by(SubscriptionTier.sort_order).all()
-        return render_template("public_intake.html", countries=COUNTRIES, tiers=tiers, token=token)
+        return render_template("public_intake.html", countries=COUNTRIES, tiers=tiers, token=token, links=_get_links_config())
 
     # Process submission (same as new_client POST logic)
     client_name = request.form.get("client_name", "").strip()
@@ -487,7 +524,14 @@ def settings():
             smtp_config = smtp_cred.get_credentials()
         except Exception:
             pass
-    return render_template("settings.html", tiers=tiers, smtp_config=smtp_config)
+    links_cred = APICredential.query.filter_by(service_name='links').first()
+    links_config = {}
+    if links_cred:
+        try:
+            links_config = links_cred.get_credentials()
+        except Exception:
+            pass
+    return render_template("settings.html", tiers=tiers, smtp_config=smtp_config, links_config=links_config)
 
 
 @app.route("/settings/tiers/new", methods=["POST"])
@@ -618,6 +662,24 @@ def edit_summary(report_id):
     db.session.commit()
     flash("Executive summary updated.", "success")
     return redirect(url_for("view_report", report_id=report_id))
+
+
+# --- Links Settings (NDA, Contract) ---
+@app.route("/settings/links", methods=["POST"])
+def save_links():
+    """Save NDA and contract URL settings"""
+    cred = APICredential.query.filter_by(service_name='links').first()
+    if not cred:
+        cred = APICredential(service_name='links')
+        db.session.add(cred)
+    links_data = {
+        'nda_url': request.form.get('nda_url', '').strip(),
+        'contract_url': request.form.get('contract_url', '').strip(),
+    }
+    cred.set_credentials(links_data)
+    db.session.commit()
+    flash("Links updated successfully.", "success")
+    return redirect(url_for("settings"))
 
 
 # --- Glossary / How It Works ---

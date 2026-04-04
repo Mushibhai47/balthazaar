@@ -162,8 +162,9 @@ class YouTubeCollector(BaseKeywordCollector):
                 vid_id = item.get('id', {}).get('videoId', '')
                 snippet = item.get('snippet', {})
                 s = stats.get(vid_id, {})
+                import html as html_mod
                 videos.append({
-                    'title': snippet.get('title', ''),
+                    'title': html_mod.unescape(snippet.get('title', '')),
                     'published': snippet.get('publishedAt', '')[:10],
                     'views': s.get('viewCount', 0),
                     'likes': s.get('likeCount', 0),

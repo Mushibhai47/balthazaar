@@ -330,6 +330,66 @@ def _compute_historical_trends(current_report, query, report_data: dict, country
                     src_data[keyword]['trend_pct'] = round(change_pct, 1)
                     src_data[keyword]['trend_periods'] = len(series)
 
+    # ── Website traffic trend ──────────────────────────────────────────
+    traffic_block = report_data.get('keywords', {}).get('website_traffic', {})
+    if traffic_block:
+        for domain_key, td in traffic_block.items():
+            if not isinstance(td, dict):
+                continue
+            cur_total = td.get('total_monthly', 0)
+            if cur_total == 0:
+                continue
+            hist_vals = []
+            for r in past_reports:
+                try:
+                    rd = json.loads(r.data) if r.data else {}
+                    past_td = rd.get('keywords', {}).get('website_traffic', {}).get(domain_key, {})
+                    v = past_td.get('total_monthly', 0) if isinstance(past_td, dict) else 0
+                    if v > 0:
+                        hist_vals.append(v)
+                except Exception:
+                    pass
+            series = [cur_total] + hist_vals
+            if len(series) < 2:
+                continue
+            mid = len(series) // 2
+            recent_avg = sum(series[:mid]) / mid
+            older_avg = sum(series[mid:]) / (len(series) - mid)
+            if older_avg == 0:
+                continue
+            change_pct = (recent_avg - older_avg) / older_avg * 100
+            td['trend'] = 'rising' if change_pct > 8 else ('declining' if change_pct < -8 else 'stable')
+            td['trend_pct'] = round(change_pct, 1)
+
+    # ── Sentiment trend ────────────────────────────────────────────────
+    sentiment_block = report_data.get('keywords', {}).get('sentiment', {})
+    if sentiment_block:
+        for sent_key, sd in sentiment_block.items():
+            if not isinstance(sd, dict):
+                continue
+            cur_pos = sd.get('positive_pct', 0)
+            hist_pos = []
+            for r in past_reports:
+                try:
+                    rd = json.loads(r.data) if r.data else {}
+                    past_sd = rd.get('keywords', {}).get('sentiment', {}).get(sent_key, {})
+                    v = past_sd.get('positive_pct', 0) if isinstance(past_sd, dict) else 0
+                    if v > 0:
+                        hist_pos.append(v)
+                except Exception:
+                    pass
+            series = [cur_pos] + hist_pos
+            if len(series) < 2:
+                continue
+            mid = len(series) // 2
+            recent_avg = sum(series[:mid]) / mid
+            older_avg = sum(series[mid:]) / (len(series) - mid)
+            if older_avg == 0:
+                continue
+            change_pct = (recent_avg - older_avg) / older_avg * 100
+            sd['sentiment_trend'] = 'rising' if change_pct > 5 else ('declining' if change_pct < -5 else 'stable')
+            sd['sentiment_trend_pct'] = round(change_pct, 1)
+
     periods_used = len(past_reports) + 1  # past + current
     report_data["metadata"]["trend_periods_used"] = periods_used
     logger.info(f"Historical trend computed from {len(past_reports)} past report(s) ({periods_used} total periods)")
