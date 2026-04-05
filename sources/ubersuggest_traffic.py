@@ -41,19 +41,31 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
                 timeout=15
             )
             if resp.status_code == 200:
+                # Extract JWT token from response and set as Authorization header
+                try:
+                    body = resp.json()
+                    token = (body.get('data', {}) or {}).get('token') or body.get('token') or body.get('access_token')
+                    if token:
+                        self.session.headers.update({'Authorization': f'Bearer {token}'})
+                        logger.info("Ubersuggest: JWT token extracted and set")
+                    else:
+                        logger.info("Ubersuggest: no token in body, using session cookies")
+                except Exception:
+                    pass
                 self._logged_in = True
                 return True
+            logger.warning(f"Ubersuggest login returned {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
             logger.warning(f"Ubersuggest login failed: {e}")
         return False
 
-    def _fetch_traffic(self, domain: str, label: str, entity_type: str) -> Dict[str, Any]:
+    def _fetch_traffic(self, domain: str, label: str, entity_type: str, country_code: str = 'us') -> Dict[str, Any]:
         """Fetch traffic overview for a domain"""
         domain = domain.replace('https://', '').replace('http://', '').rstrip('/')
         try:
             resp = self.session.get(
                 f"{self.BASE_URL}/traffic/overview",
-                params={'domain': domain, 'country': 'us', 'currency': 'USD'},
+                params={'domain': domain, 'country': country_code, 'currency': 'USD'},
                 timeout=15
             )
             if resp.status_code != 200:
@@ -76,6 +88,13 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
             logger.warning(f"Traffic fetch failed for {domain}: {e}")
             return {'domain': domain, 'label': label, 'type': entity_type, 'error': str(e)[:100]}
 
+    COUNTRY_CODE_MAP = {
+        'Australia': 'au', 'Singapore': 'sg', 'United Kingdom': 'gb',
+        'United States': 'us', 'Canada': 'ca', 'New Zealand': 'nz',
+        'India': 'in', 'South Africa': 'za', 'Germany': 'de',
+        'France': 'fr', 'Spain': 'es', 'Brazil': 'br',
+    }
+
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
         results = {}
 
@@ -83,12 +102,15 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
             # Return empty structure — no credentials
             return {}
 
+        country_code = self.COUNTRY_CODE_MAP.get(countries[0] if countries else 'United States', 'us')
+
         # Client website
         if self.client_website:
             results['client'] = self._fetch_traffic(
                 self.client_website,
                 label=self.client_website,
-                entity_type='client'
+                entity_type='client',
+                country_code=country_code
             )
 
         # Competitors
@@ -97,7 +119,7 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
             name = comp.get('name', website)
             if website:
                 key = f"competitor_{name}"
-                results[key] = self._fetch_traffic(website, label=name, entity_type='competitor')
+                results[key] = self._fetch_traffic(website, label=name, entity_type='competitor', country_code=country_code)
 
         return results
 

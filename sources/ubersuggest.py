@@ -61,15 +61,35 @@ class UbersuggestCollector(BaseKeywordCollector):
             )
 
             if login_resp.status_code != 200:
-                raise Exception(f"Ubersuggest login failed: {login_resp.status_code}")
+                raise Exception(f"Ubersuggest login failed: {login_resp.status_code} — {login_resp.text[:200]}")
+
+            # Extract JWT token and set Authorization header
+            try:
+                body = login_resp.json()
+                token = (body.get('data', {}) or {}).get('token') or body.get('token') or body.get('access_token')
+                if token:
+                    session.headers.update({'Authorization': f'Bearer {token}'})
+                    logger.info("Ubersuggest: JWT token set")
+            except Exception:
+                pass
 
             logger.info("Ubersuggest login successful")
+
+            # Map country to Ubersuggest locId
+            LOC_ID_MAP = {
+                'Australia': '2036', 'Singapore': '2702', 'United Kingdom': '2826',
+                'United States': '2840', 'Canada': '2124', 'New Zealand': '2554',
+                'India': '2356', 'South Africa': '2710', 'Germany': '2276',
+                'France': '2250', 'Spain': '2724', 'Brazil': '2076',
+            }
+            country = countries[0] if countries else 'United States'
+            loc_id = LOC_ID_MAP.get(country, '2840')
 
             for keyword in keywords:
                 try:
                     resp = session.get(
                         'https://app.neilpatel.com/api/keywords/keyword_overview',
-                        params={'keyword': keyword, 'language': 'en', 'locId': '2840'},
+                        params={'keyword': keyword, 'language': 'en', 'locId': loc_id},
                         timeout=15
                     )
                     if resp.status_code == 200:
