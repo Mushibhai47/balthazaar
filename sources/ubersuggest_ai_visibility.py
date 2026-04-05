@@ -42,17 +42,21 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
                 json={'email': self.email, 'password': self.password},
                 timeout=15
             )
+            logger.warning(f"[UBER-DEBUG] ai-vis login status={resp.status_code} body={resp.text[:400]}")
             if resp.status_code == 200:
                 try:
                     body = resp.json()
                     token = (body.get('data', {}) or {}).get('token') or body.get('token') or body.get('access_token')
                     if token:
                         self.session.headers.update({'Authorization': f'Bearer {token}'})
-                except Exception:
-                    pass
+                        logger.warning(f"[UBER-DEBUG] ai-vis token set len={len(token)}")
+                    else:
+                        logger.warning(f"[UBER-DEBUG] ai-vis NO token, body keys={list(body.keys())}")
+                except Exception as ex:
+                    logger.warning(f"[UBER-DEBUG] ai-vis login parse error: {ex}")
                 self._logged_in = True
                 return True
-            logger.warning(f"Ubersuggest login returned {resp.status_code}: {resp.text[:200]}")
+            logger.warning(f"Ubersuggest ai-vis login returned {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
             logger.warning(f"Ubersuggest login failed: {e}")
         return False

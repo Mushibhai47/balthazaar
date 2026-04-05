@@ -40,21 +40,21 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
                 json={'email': self.email, 'password': self.password},
                 timeout=15
             )
+            logger.warning(f"[UBER-DEBUG] traffic login status={resp.status_code} body={resp.text[:400]}")
             if resp.status_code == 200:
-                # Extract JWT token from response and set as Authorization header
                 try:
                     body = resp.json()
                     token = (body.get('data', {}) or {}).get('token') or body.get('token') or body.get('access_token')
                     if token:
                         self.session.headers.update({'Authorization': f'Bearer {token}'})
-                        logger.info("Ubersuggest: JWT token extracted and set")
+                        logger.warning(f"[UBER-DEBUG] traffic token set len={len(token)}")
                     else:
-                        logger.info("Ubersuggest: no token in body, using session cookies")
-                except Exception:
-                    pass
+                        logger.warning(f"[UBER-DEBUG] traffic NO token, body keys={list(body.keys())}")
+                except Exception as ex:
+                    logger.warning(f"[UBER-DEBUG] traffic login parse error: {ex}")
                 self._logged_in = True
                 return True
-            logger.warning(f"Ubersuggest login returned {resp.status_code}: {resp.text[:200]}")
+            logger.warning(f"Ubersuggest traffic login returned {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
             logger.warning(f"Ubersuggest login failed: {e}")
         return False
@@ -68,11 +68,13 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
                 params={'domain': domain, 'country': country_code, 'currency': 'USD'},
                 timeout=15
             )
+            logger.warning(f"[UBER-DEBUG] traffic API {domain} status={resp.status_code} body={resp.text[:300]}")
             if resp.status_code != 200:
                 return {'domain': domain, 'label': label, 'type': entity_type, 'error': f'HTTP {resp.status_code}'}
 
             data = resp.json()
             overview = data.get('overview', data)
+            logger.warning(f"[UBER-DEBUG] traffic overview keys={list(overview.keys()) if isinstance(overview, dict) else type(overview)}")
             return {
                 'domain': domain,
                 'label': label,
