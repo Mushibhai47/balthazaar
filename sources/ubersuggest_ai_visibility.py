@@ -43,8 +43,16 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
                 timeout=15
             )
             if resp.status_code == 200:
+                try:
+                    body = resp.json()
+                    token = (body.get('data', {}) or {}).get('token') or body.get('token') or body.get('access_token')
+                    if token:
+                        self.session.headers.update({'Authorization': f'Bearer {token}'})
+                except Exception:
+                    pass
                 self._logged_in = True
                 return True
+            logger.warning(f"Ubersuggest login returned {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
             logger.warning(f"Ubersuggest login failed: {e}")
         return False
