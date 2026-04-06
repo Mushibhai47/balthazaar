@@ -21,7 +21,7 @@ ENV_CREDENTIAL_MAP = {
     'youtube':       {'api_key': 'YOUTUBE_API_KEY'},
     'tiktok':        {'client_key': 'TIKTOK_CLIENT_KEY', 'client_secret': 'TIKTOK_CLIENT_SECRET'},
     'instagram':     {'access_token': 'INSTAGRAM_ACCESS_TOKEN', 'app_id': 'INSTAGRAM_APP_ID', 'app_secret': 'INSTAGRAM_APP_SECRET'},
-    'ubersuggest':   {'email': 'UBERSUGGEST_EMAIL', 'password': 'UBERSUGGEST_PASSWORD'},
+    'ubersuggest':   {'email': 'UBERSUGGEST_EMAIL', 'password': 'UBERSUGGEST_PASSWORD', 'bearer_token': 'UBERSUGGEST_BEARER_TOKEN'},
     'google_ads':    {'developer_token': 'GOOGLE_ADS_DEVELOPER_TOKEN', 'client_id': 'GOOGLE_ADS_CLIENT_ID',
                       'client_secret': 'GOOGLE_ADS_CLIENT_SECRET', 'refresh_token': 'GOOGLE_ADS_REFRESH_TOKEN',
                       'customer_id': 'GOOGLE_ADS_CUSTOMER_ID'},
