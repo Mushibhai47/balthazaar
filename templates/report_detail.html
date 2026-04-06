@@ -424,7 +424,45 @@
                 </tbody>
             </table>
         </div>
-        {% if ai_data %}
+        {% set ai_prompts = ai_data.get('_ai_prompts', []) %}
+        {% if ai_prompts %}
+        <div class="mt-6 pt-5 border-t border-gray-100">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="material-symbols-outlined text-purple-500 text-[20px]">auto_awesome</span>
+                <h3 class="text-sm font-semibold text-gray-700">Top AI Search Prompts</h3>
+                <span class="text-xs text-gray-400">Questions people ask AI assistants about this topic</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-100">
+                            <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">#</th>
+                            <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">AI Prompt / Question</th>
+                            <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Est. Volume</th>
+                            <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Competition</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in ai_prompts %}
+                        <tr class="border-b border-gray-50 hover:bg-purple-50/30 transition">
+                            <td class="py-2.5 px-3 text-gray-400 text-xs font-mono">{{ loop.index }}</td>
+                            <td class="py-2.5 px-3 text-gray-700 text-sm italic">"{{ p.get('prompt', '') }}"</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-xs text-gray-600">
+                                {% if p.get('search_volume', 0) > 0 %}{{ '{:,}'.format(p.get('search_volume')) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                                {% set comp = p.get('competition', '') %}
+                                {% if comp == 'HIGH' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">High</span>
+                                {% elif comp == 'MEDIUM' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-600 border border-amber-200">Med</span>
+                                {% elif comp == 'LOW' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
+                                {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
         {% endif %}
     </div>
     {% endif %}
@@ -460,7 +498,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Monthly Volume',
+                        label: 'Search Volume',
                         data: data,
                         backgroundColor: 'rgba(107, 81, 240, 0.15)',
                         borderColor: 'rgba(107, 81, 240, 0.8)',
@@ -835,7 +873,12 @@
             {% for key, ad in ads_data.items() %}
             {% if ad.get('ads') %}
             <div class="mb-3 pb-3 border-b border-gray-50 last:border-0">
-                <p class="text-xs font-semibold text-gray-500 mb-2">Ads for "{{ ad.get('search_term', key) }}" <span class="font-normal text-gray-400">({{ ad.get('total', 0) }} found)</span></p>
+                <p class="text-xs font-semibold text-gray-500 mb-2">
+                    {% if ad.get('entity_type') == 'client' %}🏢 {{ ad.get('org_name', ad.get('search_term', key)) }}
+                    {% elif ad.get('entity_type') == 'competitor' %}🏬 {{ ad.get('org_name', ad.get('search_term', key)) }}
+                    {% else %}🔍 Keyword: {{ ad.get('search_term', key) }}{% endif %}
+                    <span class="font-normal text-gray-400">({{ ad.get('total', 0) }} ads found)</span>
+                </p>
                 <div class="space-y-2">
                     {% for a in ad.get('ads', [])[:5] %}
                     <div class="flex items-center justify-between p-3 bg-blue-50/30 rounded-xl border border-blue-100 text-xs">
@@ -889,7 +932,7 @@
                     </div>
                     <div class="text-right">
                         <p class="text-gray-600 font-mono">${{ '%.2f'|format(gad.get('suggested_bid', 0)) }} bid</p>
-                        <p class="text-gray-400">{{ '{:,}'.format(gad.get('avg_monthly_searches', 0)) }} searches/mo</p>
+                        <p class="text-gray-400">{{ '{:,}'.format(gad.get('avg_monthly_searches', 0)) }} searches/period</p>
                     </div>
                 </div>
                 {% endif %}

@@ -72,6 +72,14 @@ class OpenAICollector(BaseKeywordCollector):
             batch_results = self._parse_response(response.choices[0].message.content, batch)
             results.update(batch_results)
 
+        # Generate top 10 AI prompts for the topic
+        try:
+            ai_prompts = self._generate_ai_prompts(keywords, countries)
+            if ai_prompts:
+                results['_ai_prompts'] = ai_prompts
+        except Exception as e:
+            logger.warning(f"AI prompts generation failed: {e}")
+
         return results
 
     def _create_prompt(self, keywords: List[str], countries: List[str]) -> str:
@@ -141,6 +149,58 @@ Format your response as JSON with this structure:
                     "raw_response": response_text[:200]  # Include snippet for debugging
                 }
             return fallback_data
+
+    def _generate_ai_prompts(self, keywords: List[str], countries: List[str]) -> List[Dict[str, Any]]:
+        """Generate top 10 natural language AI search prompts related to the tracked keywords"""
+        import json, re
+        topic = ", ".join(keywords[:5])
+        country = countries[0] if countries else "the target market"
+
+        prompt = f"""Based on these keywords related to a business topic: {topic}
+
+Generate the top 10 natural language questions or prompts that people would type into ChatGPT or an AI assistant when researching this topic in {country}.
+
+These should be realistic, conversational queries — not just keyword phrases.
+
+For each prompt, estimate:
+- Monthly AI search volume (how many times per month people ask this type of question)
+- Competition level (LOW / MEDIUM / HIGH)
+
+Return ONLY valid JSON in this exact format:
+{{
+  "prompts": [
+    {{
+      "prompt": "What are the best options for [topic] in [country]?",
+      "search_volume": 5000,
+      "competition": "MEDIUM"
+    }}
+  ]
+}}"""
+
+        response = self.client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            messages=[
+                {"role": "system", "content": "You are an AI search trends analyst. Return only valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.4,
+            max_tokens=1200
+        )
+
+        text = response.choices[0].message.content
+        json_match = re.search(r'```json\s*(.*?)\s*```', text, re.DOTALL)
+        if json_match:
+            text = json_match.group(1)
+        else:
+            json_match = re.search(r'\{.*\}', text, re.DOTALL)
+            if json_match:
+                text = json_match.group(0)
+
+        parsed = json.loads(text)
+        prompts = parsed.get('prompts', [])
+        # Sort by volume descending, return top 10
+        prompts.sort(key=lambda x: x.get('search_volume', 0), reverse=True)
+        return prompts[:10]
 
     def validate_credentials(self) -> bool:
         """Validate OpenAI API key"""
