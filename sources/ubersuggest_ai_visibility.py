@@ -170,18 +170,31 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
         return result
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
+        # AI Search Visibility requires Ubersuggest paid plan — return placeholder data
         results = {}
-        if not self._login():
-            return {}
+        domains = []
         if self.client_website:
-            results['client'] = self._fetch_ai_visibility(
-                self.client_website, self.client_name or self.client_website, 'client'
-            )
+            domains.append((self.client_website, self.client_name or self.client_website, 'client'))
         for comp in self.competitors[:4]:
             website = comp.get('website', '')
             name = comp.get('name', website)
             if website:
-                results[f"competitor_{name}"] = self._fetch_ai_visibility(website, name, 'competitor')
+                domains.append((website, name, 'competitor'))
+
+        for website, label, entity_type in domains:
+            domain = _clean_domain(website)
+            key = 'client' if entity_type == 'client' else f"competitor_{label}"
+            results[key] = {
+                'domain': domain,
+                'label': label,
+                'type': entity_type,
+                'brand_visibility_pct': 0,
+                'industry_rank': None,
+                'total_analyzed': 0,
+                'top_prompts': [],
+                'competitor_comparison': [],
+                'error': 'Requires Ubersuggest paid plan',
+            }
         return results
 
     def validate_credentials(self) -> bool:

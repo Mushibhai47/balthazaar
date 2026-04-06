@@ -10,14 +10,6 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
-# Candidate API endpoints for traffic data (tried in order)
-TRAFFIC_ENDPOINTS = [
-    "/traffic_analyzer/overview",
-    "/traffic_analyzer",
-    "/domain/overview",
-    "/traffic/stats",
-]
-
 
 def _clean_domain(url: str) -> str:
     """Extract bare hostname from any URL form"""
@@ -49,7 +41,6 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
             'Origin': 'https://app.neilpatel.com',
         })
         self._logged_in = False
-        self._working_endpoint = None
 
     def _login(self) -> bool:
         if self._logged_in:
@@ -77,47 +68,41 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
             logger.warning(f"Ubersuggest traffic login failed: {e}")
         return False
 
-    def _fetch_traffic(self, domain: str, label: str, entity_type: str, country_code: str = 'us') -> Dict[str, Any]:
+    def _fetch_traffic(self, domain: str, label: str, entity_type: str, country_code: str = 'us', loc_id: str = '2840') -> Dict[str, Any]:
         """Fetch traffic overview for a domain"""
         domain = _clean_domain(domain)
         if not domain:
             return {'domain': domain, 'label': label, 'type': entity_type, 'error': 'Empty domain'}
 
-        # Try cached working endpoint first, then probe all candidates
-        endpoints_to_try = ([self._working_endpoint] if self._working_endpoint else []) + \
-                           [e for e in TRAFFIC_ENDPOINTS if e != self._working_endpoint]
+        try:
+            resp = self.session.get(
+                f"{self.BASE_URL}/domain_overview",
+                params={'domain': domain, 'lang': 'en', 'locId': loc_id},
+                timeout=15
+            )
+            if resp.status_code != 200:
+                return {'domain': domain, 'label': label, 'type': entity_type, 'error': f'HTTP {resp.status_code}'}
 
-        for endpoint in endpoints_to_try:
-            try:
-                resp = self.session.get(
-                    f"{self.BASE_URL}{endpoint}",
-                    params={'domain': domain, 'country': country_code, 'currency': 'USD'},
-                    timeout=15
-                )
-                if resp.status_code == 200:
-                    self._working_endpoint = endpoint
-                    data = resp.json()
-                    overview = data.get('overview', data)
-                    return {
-                        'domain': domain,
-                        'label': label,
-                        'type': entity_type,
-                        'organic_monthly': overview.get('organic', overview.get('organicTraffic', 0)),
-                        'paid_monthly': overview.get('paid', overview.get('paidTraffic', 0)),
-                        'total_monthly': overview.get('total', overview.get('totalTraffic', 0)),
-                        'domain_score': overview.get('domainScore', overview.get('da', 0)),
-                        'backlinks': overview.get('backlinks', 0),
-                        'keywords_count': overview.get('keywords', 0),
-                    }
-                elif resp.status_code not in (403, 404):
-                    # Unexpected error — stop trying
-                    logger.warning(f"Ubersuggest traffic {endpoint} returned {resp.status_code} for {domain}")
-                    break
-            except Exception as e:
-                logger.warning(f"Ubersuggest traffic request failed for {domain}: {e}")
-                break
+            data = resp.json()
+            # Get latest month traffic from domainTraffic time series
+            domain_traffic = data.get('domainTraffic', {})
+            latest_month = max(domain_traffic.keys()) if domain_traffic else None
+            latest = domain_traffic.get(latest_month, {}) if latest_month else {}
 
-        return {'domain': domain, 'label': label, 'type': entity_type, 'error': 'Endpoint not available'}
+            return {
+                'domain': domain,
+                'label': label,
+                'type': entity_type,
+                'organic_monthly': data.get('traffic', latest.get('searchTraffic', 0)),
+                'paid_monthly': data.get('paidTraffic', latest.get('paidTraffic', 0)),
+                'total_monthly': data.get('traffic', 0),
+                'domain_score': data.get('domainAuthority', 0),
+                'backlinks': data.get('backlinks', 0),
+                'keywords_count': data.get('organic', 0),
+            }
+        except Exception as e:
+            logger.warning(f"Ubersuggest traffic fetch failed for {domain}: {e}")
+            return {'domain': domain, 'label': label, 'type': entity_type, 'error': str(e)[:100]}
 
     COUNTRY_CODE_MAP = {
         'Australia': 'au', 'Singapore': 'sg', 'United Kingdom': 'gb',
@@ -126,20 +111,30 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
         'France': 'fr', 'Spain': 'es', 'Brazil': 'br',
     }
 
+    LOC_ID_MAP = {
+        'Australia': '2036', 'Singapore': '2702', 'United Kingdom': '2826',
+        'United States': '2840', 'Canada': '2124', 'New Zealand': '2554',
+        'India': '2356', 'South Africa': '2710', 'Germany': '2276',
+        'France': '2250', 'Spain': '2724', 'Brazil': '2076',
+    }
+
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
         results = {}
 
         if not self._login():
             return {}
 
-        country_code = self.COUNTRY_CODE_MAP.get(countries[0] if countries else 'United States', 'us')
+        country = countries[0] if countries else 'United States'
+        country_code = self.COUNTRY_CODE_MAP.get(country, 'us')
+        loc_id = self.LOC_ID_MAP.get(country, '2840')
 
         if self.client_website:
             results['client'] = self._fetch_traffic(
                 self.client_website,
                 label=self.client_website,
                 entity_type='client',
-                country_code=country_code
+                country_code=country_code,
+                loc_id=loc_id
             )
 
         for comp in self.competitors[:4]:
@@ -147,7 +142,7 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
             name = comp.get('name', website)
             if website:
                 key = f"competitor_{name}"
-                results[key] = self._fetch_traffic(website, label=name, entity_type='competitor', country_code=country_code)
+                results[key] = self._fetch_traffic(website, label=name, entity_type='competitor', country_code=country_code, loc_id=loc_id)
 
         return results
 
