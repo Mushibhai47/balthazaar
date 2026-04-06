@@ -67,6 +67,8 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
                 try:
                     body = resp.json()
                     token = (body.get('data', {}) or {}).get('token') or body.get('token') or body.get('access_token')
+                    if not token:
+                        token = self.session.cookies.get('id')
                     if token:
                         self.session.headers.update({'Authorization': f'Bearer {token}'})
                 except Exception:

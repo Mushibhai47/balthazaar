@@ -67,9 +67,10 @@ class UbersuggestCollector(BaseKeywordCollector):
             try:
                 body = login_resp.json()
                 token = (body.get('data', {}) or {}).get('token') or body.get('token') or body.get('access_token')
+                if not token:
+                    token = session.cookies.get('id')
                 if token:
                     session.headers.update({'Authorization': f'Bearer {token}'})
-                    logger.info("Ubersuggest: JWT token set")
             except Exception:
                 pass
 

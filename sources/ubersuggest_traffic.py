@@ -61,8 +61,11 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
                         self.session.headers.update({'Authorization': f'Bearer {token}'})
                 except Exception:
                     pass
+                # The 'id' cookie contains the JWT — set it as Bearer token
+                id_token = self.session.cookies.get('id')
+                if id_token:
+                    self.session.headers.update({'Authorization': f'Bearer {id_token}'})
                 self._logged_in = True
-                logger.warning(f"[TRAFFIC] login OK, cookies={list(self.session.cookies.keys())}")
                 return True
             logger.warning(f"Ubersuggest traffic login returned {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
@@ -81,7 +84,6 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
                 params={'domain': domain, 'lang': 'en', 'locId': loc_id},
                 timeout=15
             )
-            logger.warning(f"[TRAFFIC] {domain} status={resp.status_code} body={resp.text[:200]}")
             if resp.status_code != 200:
                 return {'domain': domain, 'label': label, 'type': entity_type, 'error': f'HTTP {resp.status_code}'}
 
