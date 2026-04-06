@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from sqlalchemy import func
-from database.models import db, Client, Competitor, Query, Report, SubscriptionTier, ShareableLink, APICredential
+from database.models import db, Client, Competitor, Query, Report, SubscriptionTier, ShareableLink, APICredential, GlossarySection
 from config import Config
 from countries import COUNTRIES
 from datetime import datetime
@@ -76,6 +76,33 @@ with app.app_context():
             conn.commit()
     except Exception:
         pass  # Column already exists
+    seed_default_glossary()
+
+
+DEFAULT_GLOSSARY = [
+    {'icon': 'psychology', 'color': 'text-brand', 'title': 'ChatGPT Overall Market Score', 'source': 'Powered by OpenAI GPT-4o', 'description': 'A score from 0–100 reflecting the overall competitive strength of a brand. Calculated by GPT-4o after analysing keyword trends, search volume, competition levels, CPC data, news sentiment, and competitor activity. A higher score indicates stronger market presence and opportunity. Scores are generated for the client and each selected competitor independently.', 'fields': ['0–40: Weak market presence', '41–65: Moderate, room to grow', '66–80: Strong competitive position', '81–100: Market leader']},
+    {'icon': 'search', 'color': 'text-indigo-500', 'title': 'Keyword Volume & Trends', 'source': 'OpenAI / Google Gemini', 'description': 'Monthly search volume estimates for each tracked keyword. Trend direction (↑ rising / — stable / ↓ declining) reflects whether search interest is increasing or decreasing. CPC (Cost Per Click) shows the estimated advertising cost for that keyword.', 'fields': ['Volume: estimated monthly searches', 'Avg. Volume: 6-month average', 'CPC: estimated Google Ads cost per click', 'Competition: LOW / MEDIUM / HIGH']},
+    {'icon': 'bar_chart', 'color': 'text-indigo-600', 'title': 'Website Traffic', 'source': 'Ubersuggest', 'description': 'Estimated monthly website visits pulled from Ubersuggest for the client and each competitor. Split into organic (SEO-driven) and paid (advertising-driven) traffic.', 'fields': ['Organic: visits from search engines (unpaid)', 'Paid: visits from paid advertising', 'Domain Score: overall domain authority (0–100)']},
+    {'icon': 'play_circle', 'color': 'text-red-500', 'title': 'YouTube Performance', 'source': 'YouTube Data API', 'description': 'Video performance data fetched via the official YouTube API. Shows how content related to tracked keywords is performing — total videos, average views, engagement rates, and which channels dominate each topic.', 'fields': ['Avg Views: average views per video', 'Engagement Rate: (likes + comments) / views × 100', 'Competition: how saturated the keyword is on YouTube']},
+    {'icon': 'sentiment_satisfied', 'color': 'text-purple-500', 'title': 'Online Sentiment', 'source': 'Google News + VADER NLP', 'description': 'Sentiment analysis of online content mentioning the brand or keywords. Uses VADER (Valence Aware Dictionary and sEntiment Reasoner), a proven NLP model, to score each piece of content as Positive, Neutral, or Negative. Brand sentiment searches specifically for the client and competitor brand names.', 'fields': ['Positive: favourable mentions', 'Neutral: factual/balanced mentions', 'Negative: critical or unfavourable mentions', 'Score range: -1.0 (most negative) to +1.0 (most positive)']},
+    {'icon': 'newspaper', 'color': 'text-blue-500', 'title': 'Brand Monitoring & News', 'source': 'Google News RSS', 'description': 'Latest news articles mentioning the brand name or competitor names, fetched from Google News. Articles are sorted by recency. Provides real-time visibility into press coverage, announcements, and media mentions.', 'fields': ['Brand search: searches by exact brand/company name', 'Top 5 articles shown per brand', 'Source, date, and direct link provided']},
+    {'icon': 'history', 'color': 'text-amber-500', 'title': 'Website Amendments', 'source': 'Internet Archive', 'description': 'Detects changes to competitor websites by comparing historical snapshots. Identifies when pages were updated, added, or restructured — giving insight into product launches, pricing changes, and strategic shifts.', 'fields': ['Snapshot comparison over 30-day window', 'Page-level change detection', 'Direct link to historical version for comparison']},
+    {'icon': 'work', 'color': 'text-blue-700', 'title': 'Recruitment Intelligence', 'source': 'LinkedIn Jobs', 'description': 'Tracks job postings from competitors on LinkedIn. Hiring patterns reveal strategic direction — a competitor hiring data scientists signals AI investment; hiring sales staff signals market expansion.', 'fields': ['Role title and location', 'Date posted', 'Link to full job listing']},
+    {'icon': 'campaign', 'color': 'text-blue-600', 'title': 'Adverts — Meta & Google', 'source': 'Meta Ad Library API / Google Ads API', 'description': 'Active advertising campaigns run by the brand and competitors. Meta Ad Library is publicly accessible. Google Ads data requires API access. Shows what messaging and offers competitors are actively promoting.', 'fields': ['Advertiser name', 'Campaign start date', 'Estimated impressions', 'Link to view the ad creative']},
+]
+
+
+def seed_default_glossary():
+    """Seed glossary sections with defaults if table is empty"""
+    if GlossarySection.query.count() == 0:
+        for i, s in enumerate(DEFAULT_GLOSSARY):
+            section = GlossarySection(
+                title=s['title'], source=s['source'], description=s['description'],
+                icon=s['icon'], color=s['color'], sort_order=i
+            )
+            section.set_fields(s['fields'])
+            db.session.add(section)
+        db.session.commit()
 
 
 # --- Dashboard ---
@@ -690,7 +717,66 @@ def save_links():
 # --- Glossary / How It Works ---
 @app.route("/glossary")
 def glossary():
-    return render_template("glossary.html")
+    sections = GlossarySection.query.filter_by(is_active=True).order_by(GlossarySection.sort_order).all()
+    return render_template("glossary.html", sections=sections)
+
+
+@app.route("/glossary/new", methods=["POST"])
+def glossary_new():
+    title = request.form.get("title", "").strip()
+    if not title:
+        flash("Title is required.", "error")
+        return redirect(url_for("glossary"))
+    fields_raw = request.form.get("fields", "")
+    fields_list = [f.strip() for f in fields_raw.splitlines() if f.strip()]
+    max_order = db.session.query(func.max(GlossarySection.sort_order)).scalar() or 0
+    section = GlossarySection(
+        title=title,
+        source=request.form.get("source", "").strip(),
+        description=request.form.get("description", "").strip(),
+        icon=request.form.get("icon", "info").strip() or "info",
+        color=request.form.get("color", "text-brand").strip() or "text-brand",
+        sort_order=max_order + 1,
+    )
+    section.set_fields(fields_list)
+    db.session.add(section)
+    db.session.commit()
+    flash("Terminology section added.", "success")
+    return redirect(url_for("glossary"))
+
+
+@app.route("/glossary/<int:section_id>/edit", methods=["POST"])
+def glossary_edit(section_id):
+    section = db.get_or_404(GlossarySection, section_id)
+    section.title = request.form.get("title", section.title).strip()
+    section.source = request.form.get("source", section.source).strip()
+    section.description = request.form.get("description", section.description).strip()
+    section.icon = request.form.get("icon", section.icon).strip() or section.icon
+    section.color = request.form.get("color", section.color).strip() or section.color
+    fields_raw = request.form.get("fields", "")
+    fields_list = [f.strip() for f in fields_raw.splitlines() if f.strip()]
+    section.set_fields(fields_list)
+    db.session.commit()
+    flash("Section updated.", "success")
+    return redirect(url_for("glossary"))
+
+
+@app.route("/glossary/<int:section_id>/delete", methods=["POST"])
+def glossary_delete(section_id):
+    section = db.get_or_404(GlossarySection, section_id)
+    db.session.delete(section)
+    db.session.commit()
+    flash("Section deleted.", "success")
+    return redirect(url_for("glossary"))
+
+
+@app.route("/glossary/reorder", methods=["POST"])
+def glossary_reorder():
+    order = request.json.get("order", [])
+    for idx, sid in enumerate(order):
+        GlossarySection.query.filter_by(id=sid).update({"sort_order": idx})
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
 # --- SMTP Settings ---

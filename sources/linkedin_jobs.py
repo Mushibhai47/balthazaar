@@ -32,9 +32,14 @@ class LinkedInJobsCollector(BaseKeywordCollector):
         country = countries[0] if countries else 'United States'
 
         if self.client_name:
-            results['_client'] = self._get_jobs(self.client_name, country)
+            client_jobs = self._get_jobs(self.client_name, country)
+            client_website = self.credentials.get('_client_website', '')
+            client_website_jobs = self._get_website_jobs(self.client_name, client_website)
+            if client_website_jobs.get('jobs_found', 0) > 0:
+                client_jobs['website_jobs'] = client_website_jobs
+            results['_client'] = client_jobs
 
-        for idx, comp in enumerate(self.competitors[:5]):
+        for idx, comp in enumerate(self.competitors):
             name = comp.get('name', '')
             website = comp.get('website', '')
             if name:
