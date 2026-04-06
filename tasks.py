@@ -29,21 +29,34 @@ ENV_CREDENTIAL_MAP = {
 
 
 def load_credentials(service_name: str):
-    """Load credentials from DB first, fall back to environment variables"""
+    """Load credentials from DB first, fall back to environment variables.
+    Always supplements with any env-var fields missing from the DB record
+    (e.g. bearer_token that was added to ENV_CREDENTIAL_MAP after the DB row
+    was created)."""
+    db_creds = None
     cred = APICredential.query.filter_by(service_name=service_name, is_active=True).first()
     if cred:
         try:
-            return cred.get_credentials()
+            db_creds = cred.get_credentials()
         except Exception as e:
             logger.warning(f"Failed to decrypt credentials for {service_name}: {e}")
 
-    # Fallback to env vars
+    # Build env-var credentials for this service
     env_map = ENV_CREDENTIAL_MAP.get(service_name, {})
+    env_creds = {}
     if env_map:
-        creds = {field: os.environ.get(env_var, '') for field, env_var in env_map.items()}
-        if any(v for v in creds.values()):  # at least one value present
-            logger.info(f"[{service_name}] Using credentials from environment variables")
-            return creds
+        env_creds = {field: os.environ.get(env_var, '') for field, env_var in env_map.items()}
+
+    if db_creds is not None:
+        # Merge: DB values take precedence; supplement any missing fields from env
+        for field, value in env_creds.items():
+            if value and not db_creds.get(field):
+                db_creds[field] = value
+        return db_creds
+
+    if env_creds and any(v for v in env_creds.values()):
+        logger.info(f"[{service_name}] Using credentials from environment variables")
+        return env_creds
 
     return None
 
