@@ -31,6 +31,7 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
         super().__init__(credentials)
         self.email = credentials.get('email', '')
         self.password = credentials.get('password', '')
+        self.bearer_token = credentials.get('bearer_token', '')
         self.client_website = credentials.get('_client_website', '')
         self.competitors = credentials.get('_competitors', [])
         self.session = requests.Session()
@@ -40,10 +41,16 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
             'Referer': 'https://app.neilpatel.com/',
             'Origin': 'https://app.neilpatel.com',
         })
+        if self.bearer_token:
+            self.session.headers.update({'Authorization': f'Bearer {self.bearer_token}'})
         self._logged_in = False
 
     def _login(self) -> bool:
         if self._logged_in:
+            return True
+        # If bearer token provided directly, skip login
+        if self.bearer_token:
+            self._logged_in = True
             return True
         if not self.email or not self.password:
             return False
@@ -84,7 +91,6 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
                 params={'domain': domain, 'lang': 'en', 'locId': loc_id},
                 timeout=15
             )
-            logger.warning(f"[T] {domain} {resp.status_code} auth={bool(self.session.headers.get('Authorization'))} body={resp.text[:80]}")
             if resp.status_code != 200:
                 return {'domain': domain, 'label': label, 'type': entity_type, 'error': f'HTTP {resp.status_code}'}
 
