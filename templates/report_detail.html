@@ -193,23 +193,6 @@
             </div>
             {% endif %}
         </div>
-        {% if insights.get('competitor_scores') %}
-        <div class="mt-5 pt-4 border-t border-brand/10">
-            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">ChatGPT Market Score</h4>
-            <div class="flex flex-wrap gap-3">
-                <div class="bg-white rounded-xl px-4 py-3 border border-brand/20 text-center min-w-[100px]">
-                    <div class="text-xl font-bold text-brand">{{ insights.overall_score }}<span class="text-xs text-gray-400">/100</span></div>
-                    <div class="text-xs text-gray-500 mt-0.5 font-medium">{{ client.name }}</div>
-                </div>
-                {% for comp_name, score in insights.competitor_scores.items() %}
-                <div class="bg-white rounded-xl px-4 py-3 border border-gray-200 text-center min-w-[100px]">
-                    <div class="text-xl font-bold text-gray-600">{{ score }}<span class="text-xs text-gray-400">/100</span></div>
-                    <div class="text-xs text-gray-500 mt-0.5">{{ comp_name }}</div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
     </div>
     {% endif %}
 
@@ -641,7 +624,6 @@
                         {% if st == 'rising' %}<span class="text-emerald-500 font-bold text-sm" title="Positive sentiment trending up{% if stp %} {{ '%+.1f'|format(stp) }}%{% endif %}">↑{% if stp %}<span class="text-[9px] font-normal">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
                         {% elif st == 'declining' %}<span class="text-red-400 font-bold text-sm" title="Positive sentiment trending down{% if stp %} {{ '%+.1f'|format(stp) }}%{% endif %}">↓{% if stp %}<span class="text-[9px] font-normal">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
                         {% elif st == 'stable' %}<span class="text-amber-400 font-bold">—</span>{% endif %}
-                        <span class="text-xs text-gray-400">{{ sd.get('total_analyzed', 0) }} data points</span>
                     </div>
                 </div>
                 <div class="flex gap-2">
@@ -699,7 +681,6 @@
             <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
                 <div class="flex items-center justify-between mb-2">
                     <h3 class="font-semibold text-gray-700 text-sm">{{ kw }}</h3>
-                    <span class="text-xs text-gray-400">{{ sd.get('total_analyzed', 0) }} analyzed</span>
                 </div>
                 <div class="flex gap-2">
                     <div class="flex-1 bg-emerald-50 rounded-lg p-2 text-center"><p class="text-lg font-bold text-emerald-600">{{ sd.get('positive_pct', 0) }}%</p><p class="text-[10px] text-emerald-500">Positive</p></div>

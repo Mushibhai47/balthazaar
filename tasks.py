@@ -423,6 +423,7 @@ def _do_generate_report(report_id: int, country_override: str = None):
             context = {
                 '_client_name': client.name,
                 '_client_website': client.website,
+                '_client_youtube': getattr(client, 'youtube_url', '') or '',
                 '_competitors': [
                     {
                         'name': c.name,

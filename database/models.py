@@ -18,6 +18,7 @@ class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     website = db.Column(db.String(500), nullable=False)
+    youtube_url = db.Column(db.String(500), default="")
     social_handles = db.Column(db.Text, default="[]")  # JSON list
     contact_name = db.Column(db.String(255), nullable=False)
     contact_email = db.Column(db.String(255), nullable=False)

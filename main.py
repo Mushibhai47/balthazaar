@@ -69,6 +69,13 @@ with app.app_context():
             conn.commit()
     except Exception:
         pass  # Column already exists
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE clients ADD COLUMN youtube_url VARCHAR(500) DEFAULT ''"))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists
 
 
 # --- Dashboard ---
@@ -127,10 +134,13 @@ def new_client():
         if h.strip():
             social_handles.append({"platform": p, "handle": h.strip()})
 
+    client_youtube = request.form.get("client_youtube", "").strip()
+
     # Create client
     client = Client(
         name=client_name,
         website=client_website,
+        youtube_url=client_youtube,
         contact_name=contact_name,
         contact_email=contact_email,
         subscription_tier=subscription_tier,
@@ -233,6 +243,7 @@ def edit_client(client_id):
 
     client.name = request.form.get("client_name", client.name).strip()
     client.website = request.form.get("client_website", client.website).strip()
+    client.youtube_url = request.form.get("client_youtube", getattr(client, 'youtube_url', '') or '').strip()
     client.contact_name = request.form.get("contact_name", client.contact_name).strip()
     client.contact_email = request.form.get("contact_email", client.contact_email).strip()
     client.subscription_tier = request.form.get("subscription_tier", client.subscription_tier)
@@ -401,9 +412,12 @@ def public_intake(token):
         if h.strip():
             social_handles.append({"platform": p, "handle": h.strip()})
 
+    client_youtube = request.form.get("client_youtube", "").strip()
+
     client = Client(
         name=client_name,
         website=client_website,
+        youtube_url=client_youtube,
         contact_name=contact_name,
         contact_email=contact_email,
         subscription_tier=subscription_tier,
