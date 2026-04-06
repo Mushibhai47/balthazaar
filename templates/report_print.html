@@ -277,9 +277,8 @@
         {% for key, sd in sentiment_data.items() %}
         {% if sd is mapping and sd.get('total_analyzed', 0) > 0 %}
         <div style="margin-bottom:12px;padding:10px;background:#F8F7FF;border-radius:8px;border:1px solid #EDE9FE">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="margin-bottom:6px">
                 <div style="font-weight:700;font-size:11px">{{ sd.get('brand_name', key) }}</div>
-                <div style="font-size:9px;color:#94a3b8">{{ sd.get('total_analyzed', 0) }} data points</div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center">
                 <div style="background:#f0fdf4;border-radius:6px;padding:6px">
@@ -378,9 +377,6 @@
             {% endif %}
         </div>
         {% endif %}
-        {% endif %}
-        {% endfor %}
-        </div>
         {% endif %}
         {% endfor %}
     </div>
