@@ -460,8 +460,6 @@ def _do_generate_report(report_id: int, country_override: str = None):
                     cred_service = cfg.get("use_credentials_from", source_name)
                     cred_dict = load_credentials(cred_service)
 
-                    if source_name in ('ubersuggest', 'website_traffic', 'ai_visibility'):
-                        logger.warning(f"[UBER-DEBUG] {source_name}: cred_service={cred_service} cred_dict_keys={list(cred_dict.keys()) if cred_dict else None}")
                     if cfg["credentials_required"] and not cred_dict:
                         logger.warning(f"No credentials for {source_name}, skipping")
                         report_data["metadata"]["sources_failed"].append(source_name)
