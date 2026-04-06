@@ -62,12 +62,14 @@ class WaybackMachineCollector(BaseKeywordCollector):
             response = requests.get(self.CDX_API, params=params, timeout=15)
 
             if response.status_code != 200:
-                return {'error': f'API {response.status_code}', 'source': 'wayback_machine', 'url': url}
+                return {'error': f'API {response.status_code}', 'source': 'wayback_machine', 'url': url,
+                        'type': entity_type, 'label': label or url}
 
             try:
                 data = response.json()
             except Exception:
-                return {'snapshots': 0, 'changes': [], 'message': 'No data', 'source': 'wayback_machine', 'url': url}
+                return {'snapshots': 0, 'changes': [], 'message': 'No data', 'source': 'wayback_machine',
+                        'url': url, 'type': entity_type, 'label': label or url}
 
             if len(data) <= 1:
                 return {
@@ -127,7 +129,8 @@ class WaybackMachineCollector(BaseKeywordCollector):
 
         except Exception as e:
             logger.error(f"Wayback Machine error for {url}: {e}")
-            return {'error': str(e)[:150], 'source': 'wayback_machine', 'url': url}
+            return {'error': str(e)[:150], 'source': 'wayback_machine', 'url': url,
+                    'type': entity_type, 'label': label or url}
 
     def validate_credentials(self) -> bool:
         return True  # No credentials needed

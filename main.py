@@ -6,6 +6,9 @@ from countries import COUNTRIES
 from datetime import datetime
 import json
 import secrets
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -504,6 +507,13 @@ def public_intake(token):
 
     link.use_count += 1
     db.session.commit()
+
+    # Notify hello@balthazaar.net that a new client form was submitted via public link
+    try:
+        from tasks import send_new_client_notification
+        send_new_client_notification(client, keywords, countries)
+    except Exception as e:
+        logger.warning(f"Public intake notification failed: {e}")
 
     return render_template("public_intake_success.html", client_name=client_name)
 
