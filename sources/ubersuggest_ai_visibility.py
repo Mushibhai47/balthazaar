@@ -7,8 +7,27 @@ from sources.base import BaseKeywordCollector
 from typing import Dict, List, Any
 import logging
 import requests
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+# Candidate API endpoint prefixes for AI visibility (tried in order)
+AI_VIS_ENDPOINTS = [
+    "/ai_search_visibility",
+    "/ai_visibility",
+    "/ai_search",
+]
+
+
+def _clean_domain(url: str) -> str:
+    """Extract bare hostname from any URL form"""
+    url = url.strip()
+    if not url:
+        return url
+    if '://' not in url:
+        url = 'https://' + url
+    parsed = urlparse(url)
+    return (parsed.netloc or parsed.path.split('/')[0]).lower().lstrip('www.')
 
 
 class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
@@ -25,11 +44,13 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
         self.competitors = credentials.get('_competitors', [])
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://app.neilpatel.com/',
+            'Origin': 'https://app.neilpatel.com',
         })
         self._logged_in = False
+        self._working_prefix = None
 
     def _login(self) -> bool:
         if self._logged_in:
@@ -42,28 +63,42 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
                 json={'email': self.email, 'password': self.password},
                 timeout=15
             )
-            logger.warning(f"[UBER-DEBUG] ai-vis login status={resp.status_code} body={resp.text[:400]}")
             if resp.status_code == 200:
                 try:
                     body = resp.json()
                     token = (body.get('data', {}) or {}).get('token') or body.get('token') or body.get('access_token')
                     if token:
                         self.session.headers.update({'Authorization': f'Bearer {token}'})
-                        logger.warning(f"[UBER-DEBUG] ai-vis token set len={len(token)}")
-                    else:
-                        logger.warning(f"[UBER-DEBUG] ai-vis NO token, body keys={list(body.keys())}")
-                except Exception as ex:
-                    logger.warning(f"[UBER-DEBUG] ai-vis login parse error: {ex}")
+                except Exception:
+                    pass
                 self._logged_in = True
                 return True
             logger.warning(f"Ubersuggest ai-vis login returned {resp.status_code}: {resp.text[:200]}")
         except Exception as e:
-            logger.warning(f"Ubersuggest login failed: {e}")
+            logger.warning(f"Ubersuggest ai-vis login failed: {e}")
         return False
+
+    def _probe_endpoint(self, domain: str) -> str | None:
+        """Find the working AI visibility endpoint prefix for this account"""
+        if self._working_prefix:
+            return self._working_prefix
+        for prefix in AI_VIS_ENDPOINTS:
+            try:
+                resp = self.session.get(
+                    f"{self.BASE_URL}{prefix}/overview",
+                    params={'domain': domain},
+                    timeout=10
+                )
+                if resp.status_code == 200:
+                    self._working_prefix = prefix
+                    return prefix
+            except Exception:
+                continue
+        return None
 
     def _fetch_ai_visibility(self, domain: str, label: str, entity_type: str) -> Dict[str, Any]:
         """Fetch AI Search Visibility for a domain"""
-        domain = domain.replace('https://', '').replace('http://', '').rstrip('/')
+        domain = _clean_domain(domain)
         result = {
             'domain': domain,
             'label': label,
@@ -74,9 +109,17 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
             'top_prompts': [],
             'competitor_comparison': [],
         }
+        if not domain:
+            return result
+
+        prefix = self._probe_endpoint(domain)
+        if not prefix:
+            result['error'] = 'AI visibility endpoint not available'
+            return result
+
         try:
             resp = self.session.get(
-                f"{self.BASE_URL}/ai_search/overview",
+                f"{self.BASE_URL}{prefix}/overview",
                 params={'domain': domain},
                 timeout=15
             )
@@ -88,7 +131,7 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
                 result['total_analyzed'] = overview.get('totalResponses', overview.get('analyzed', 0))
 
             resp2 = self.session.get(
-                f"{self.BASE_URL}/ai_search/prompts",
+                f"{self.BASE_URL}{prefix}/prompts",
                 params={'domain': domain, 'limit': 10},
                 timeout=15
             )
@@ -105,7 +148,7 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
                 ]
 
             resp3 = self.session.get(
-                f"{self.BASE_URL}/ai_search/brands",
+                f"{self.BASE_URL}{prefix}/brands",
                 params={'domain': domain, 'limit': 10},
                 timeout=15
             )
