@@ -84,6 +84,7 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
                 params={'domain': domain, 'lang': 'en', 'locId': loc_id},
                 timeout=15
             )
+            logger.warning(f"[T] {domain} {resp.status_code} auth={bool(self.session.headers.get('Authorization'))} body={resp.text[:80]}")
             if resp.status_code != 200:
                 return {'domain': domain, 'label': label, 'type': entity_type, 'error': f'HTTP {resp.status_code}'}
 
