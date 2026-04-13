@@ -91,10 +91,16 @@ class SentimentCollector(BaseKeywordCollector):
             brand_texts = self._fetch_brand_texts(brand['name'])
             if brand_texts:
                 sentiment_result = self._analyze_texts(brand_texts, analyzer)
-                sentiment_result['brand_name'] = brand['name']
-                sentiment_result['brand_type'] = brand['type']
-                sentiment_result['is_brand'] = True
-                results[brand_key] = sentiment_result
+            else:
+                sentiment_result = {
+                    'positive_pct': 0, 'neutral_pct': 0, 'negative_pct': 0,
+                    'top_positive': [], 'top_negative': [], 'total_analyzed': 0,
+                    'source': 'sentiment'
+                }
+            sentiment_result['brand_name'] = brand['name']
+            sentiment_result['brand_type'] = brand['type']
+            sentiment_result['is_brand'] = True
+            results[brand_key] = sentiment_result
 
         return results
 

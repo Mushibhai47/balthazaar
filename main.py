@@ -1,12 +1,14 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from sqlalchemy import func
-from database.models import db, Client, Competitor, Query, Report, SubscriptionTier, ShareableLink, APICredential
+from database.models import db, Client, Competitor, Query, Report, SubscriptionTier, ShareableLink, APICredential, GlossarySection
 from config import Config
 from countries import COUNTRIES
 from datetime import datetime
 import json
 import secrets
-import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -70,6 +72,40 @@ with app.app_context():
             conn.commit()
     except Exception:
         pass  # Column already exists
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE clients ADD COLUMN youtube_url VARCHAR(500) DEFAULT ''"))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists
+    seed_default_glossary()
+
+
+DEFAULT_GLOSSARY = [
+    {'icon': 'psychology', 'color': 'text-brand', 'title': 'ChatGPT Overall Market Score', 'source': 'Powered by OpenAI GPT-4o', 'description': 'A score from 0–100 reflecting the overall competitive strength of a brand. Calculated by GPT-4o after analysing keyword trends, search volume, competition levels, CPC data, news sentiment, and competitor activity. A higher score indicates stronger market presence and opportunity. Scores are generated for the client and each selected competitor independently.', 'fields': ['0–40: Weak market presence', '41–65: Moderate, room to grow', '66–80: Strong competitive position', '81–100: Market leader']},
+    {'icon': 'search', 'color': 'text-indigo-500', 'title': 'Keyword Volume & Trends', 'source': 'OpenAI / Google Gemini', 'description': 'Monthly search volume estimates for each tracked keyword. Trend direction (↑ rising / — stable / ↓ declining) reflects whether search interest is increasing or decreasing. CPC (Cost Per Click) shows the estimated advertising cost for that keyword.', 'fields': ['Volume: estimated monthly searches', 'Avg. Volume: 6-month average', 'CPC: estimated Google Ads cost per click', 'Competition: LOW / MEDIUM / HIGH']},
+    {'icon': 'bar_chart', 'color': 'text-indigo-600', 'title': 'Website Traffic', 'source': 'Ubersuggest', 'description': 'Estimated monthly website visits pulled from Ubersuggest for the client and each competitor. Split into organic (SEO-driven) and paid (advertising-driven) traffic.', 'fields': ['Organic: visits from search engines (unpaid)', 'Paid: visits from paid advertising', 'Domain Score: overall domain authority (0–100)']},
+    {'icon': 'play_circle', 'color': 'text-red-500', 'title': 'YouTube Performance', 'source': 'YouTube Data API', 'description': 'Video performance data fetched via the official YouTube API. Shows how content related to tracked keywords is performing — total videos, average views, engagement rates, and which channels dominate each topic.', 'fields': ['Avg Views: average views per video', 'Engagement Rate: (likes + comments) / views × 100', 'Competition: how saturated the keyword is on YouTube']},
+    {'icon': 'sentiment_satisfied', 'color': 'text-purple-500', 'title': 'Online Sentiment', 'source': 'Google News + VADER NLP', 'description': 'Sentiment analysis of online content mentioning the brand or keywords. Uses VADER (Valence Aware Dictionary and sEntiment Reasoner), a proven NLP model, to score each piece of content as Positive, Neutral, or Negative. Brand sentiment searches specifically for the client and competitor brand names.', 'fields': ['Positive: favourable mentions', 'Neutral: factual/balanced mentions', 'Negative: critical or unfavourable mentions', 'Score range: -1.0 (most negative) to +1.0 (most positive)']},
+    {'icon': 'newspaper', 'color': 'text-blue-500', 'title': 'Brand Monitoring & News', 'source': 'Google News RSS', 'description': 'Latest news articles mentioning the brand name or competitor names, fetched from Google News. Articles are sorted by recency. Provides real-time visibility into press coverage, announcements, and media mentions.', 'fields': ['Brand search: searches by exact brand/company name', 'Top 5 articles shown per brand', 'Source, date, and direct link provided']},
+    {'icon': 'history', 'color': 'text-amber-500', 'title': 'Website Amendments', 'source': 'Internet Archive', 'description': 'Detects changes to competitor websites by comparing historical snapshots. Identifies when pages were updated, added, or restructured — giving insight into product launches, pricing changes, and strategic shifts.', 'fields': ['Snapshot comparison over 30-day window', 'Page-level change detection', 'Direct link to historical version for comparison']},
+    {'icon': 'work', 'color': 'text-blue-700', 'title': 'Recruitment Intelligence', 'source': 'LinkedIn Jobs', 'description': 'Tracks job postings from competitors on LinkedIn. Hiring patterns reveal strategic direction — a competitor hiring data scientists signals AI investment; hiring sales staff signals market expansion.', 'fields': ['Role title and location', 'Date posted', 'Link to full job listing']},
+    {'icon': 'campaign', 'color': 'text-blue-600', 'title': 'Adverts — Meta & Google', 'source': 'Meta Ad Library API / Google Ads API', 'description': 'Active advertising campaigns run by the brand and competitors. Meta Ad Library is publicly accessible. Google Ads data requires API access. Shows what messaging and offers competitors are actively promoting.', 'fields': ['Advertiser name', 'Campaign start date', 'Estimated impressions', 'Link to view the ad creative']},
+]
+
+
+def seed_default_glossary():
+    """Seed glossary sections with defaults if table is empty"""
+    if GlossarySection.query.count() == 0:
+        for i, s in enumerate(DEFAULT_GLOSSARY):
+            section = GlossarySection(
+                title=s['title'], source=s['source'], description=s['description'],
+                icon=s['icon'], color=s['color'], sort_order=i
+            )
+            section.set_fields(s['fields'])
+            db.session.add(section)
+        db.session.commit()
 
 
 # --- Dashboard ---
@@ -79,8 +115,8 @@ def dashboard():
     total_reports = db.session.query(func.count(Report.id)).scalar() or 0
     total_competitors = db.session.query(func.count(Competitor.id)).scalar() or 0
     total_queries = db.session.query(func.count(Query.id)).scalar() or 0
-    recent_reports = (db.session.query(Report)
-        .filter(Report.status == 'complete')
+    recent_reports = (Report.query
+        .filter_by(status='complete')
         .order_by(Report.generated_at.desc())
         .limit(5).all())
     return render_template("dashboard.html", clients=clients, total_reports=total_reports,
@@ -128,10 +164,13 @@ def new_client():
         if h.strip():
             social_handles.append({"platform": p, "handle": h.strip()})
 
+    client_youtube = request.form.get("client_youtube", "").strip()
+
     # Create client
     client = Client(
         name=client_name,
         website=client_website,
+        youtube_url=client_youtube,
         contact_name=contact_name,
         contact_email=contact_email,
         subscription_tier=subscription_tier,
@@ -234,6 +273,7 @@ def edit_client(client_id):
 
     client.name = request.form.get("client_name", client.name).strip()
     client.website = request.form.get("client_website", client.website).strip()
+    client.youtube_url = request.form.get("client_youtube", getattr(client, 'youtube_url', '') or '').strip()
     client.contact_name = request.form.get("contact_name", client.contact_name).strip()
     client.contact_email = request.form.get("contact_email", client.contact_email).strip()
     client.subscription_tier = request.form.get("subscription_tier", client.subscription_tier)
@@ -292,24 +332,15 @@ def view_report(report_id):
     kw_data = data.get('keywords', {})
     ai_data = kw_data.get('openai', kw_data.get('google_gemini', {}))
     rising_count = sum(1 for kw in keywords if ai_data.get(kw, {}).get('trend') == 'rising')
-
-    # CPC chart data (paired keyword + value lists)
-    cpc_kws = [kw for kw in keywords if ai_data.get(kw, {}).get('estimated_cpc', 0) > 0]
-    cpc_vals = [ai_data.get(kw, {}).get('estimated_cpc', 0) for kw in cpc_kws]
+    cpc_vals = [ai_data.get(kw, {}).get('estimated_cpc', 0) for kw in keywords if ai_data.get(kw, {}).get('estimated_cpc', 0) > 0]
     avg_cpc = round(sum(cpc_vals) / len(cpc_vals), 2) if cpc_vals else 0.0
-
-    # Volume chart data (paired keyword + volume lists)
-    chart_kws = [kw for kw in keywords if ai_data.get(kw, {}).get('search_volume', 0) > 0]
-    chart_vols = [ai_data.get(kw, {}).get('search_volume', 0) for kw in chart_kws]
-
     metadata = data.get('metadata', {})
+
     competitors = client.competitors
     return render_template("report_detail.html",
         report=report, query=query, client=client,
         data=data, keywords=keywords,
         rising_count=rising_count, avg_cpc=avg_cpc,
-        cpc_kws=cpc_kws, cpc_vals=cpc_vals,
-        chart_kws=chart_kws, chart_vols=chart_vols,
         metadata=metadata, competitors=competitors
     )
 
@@ -411,9 +442,12 @@ def public_intake(token):
         if h.strip():
             social_handles.append({"platform": p, "handle": h.strip()})
 
+    client_youtube = request.form.get("client_youtube", "").strip()
+
     client = Client(
         name=client_name,
         website=client_website,
+        youtube_url=client_youtube,
         contact_name=contact_name,
         contact_email=contact_email,
         subscription_tier=subscription_tier,
@@ -473,6 +507,13 @@ def public_intake(token):
 
     link.use_count += 1
     db.session.commit()
+
+    # Notify hello@balthazaar.net that a new client form was submitted via public link
+    try:
+        from tasks import send_new_client_notification
+        send_new_client_notification(client, keywords, countries)
+    except Exception as e:
+        logger.warning(f"Public intake notification failed: {e}")
 
     return render_template("public_intake_success.html", client_name=client_name)
 
@@ -686,7 +727,66 @@ def save_links():
 # --- Glossary / How It Works ---
 @app.route("/glossary")
 def glossary():
-    return render_template("glossary.html")
+    sections = GlossarySection.query.filter_by(is_active=True).order_by(GlossarySection.sort_order).all()
+    return render_template("glossary.html", sections=sections)
+
+
+@app.route("/glossary/new", methods=["POST"])
+def glossary_new():
+    title = request.form.get("title", "").strip()
+    if not title:
+        flash("Title is required.", "error")
+        return redirect(url_for("glossary"))
+    fields_raw = request.form.get("fields", "")
+    fields_list = [f.strip() for f in fields_raw.splitlines() if f.strip()]
+    max_order = db.session.query(func.max(GlossarySection.sort_order)).scalar() or 0
+    section = GlossarySection(
+        title=title,
+        source=request.form.get("source", "").strip(),
+        description=request.form.get("description", "").strip(),
+        icon=request.form.get("icon", "info").strip() or "info",
+        color=request.form.get("color", "text-brand").strip() or "text-brand",
+        sort_order=max_order + 1,
+    )
+    section.set_fields(fields_list)
+    db.session.add(section)
+    db.session.commit()
+    flash("Terminology section added.", "success")
+    return redirect(url_for("glossary"))
+
+
+@app.route("/glossary/<int:section_id>/edit", methods=["POST"])
+def glossary_edit(section_id):
+    section = db.get_or_404(GlossarySection, section_id)
+    section.title = request.form.get("title", section.title).strip()
+    section.source = request.form.get("source", section.source).strip()
+    section.description = request.form.get("description", section.description).strip()
+    section.icon = request.form.get("icon", section.icon).strip() or section.icon
+    section.color = request.form.get("color", section.color).strip() or section.color
+    fields_raw = request.form.get("fields", "")
+    fields_list = [f.strip() for f in fields_raw.splitlines() if f.strip()]
+    section.set_fields(fields_list)
+    db.session.commit()
+    flash("Section updated.", "success")
+    return redirect(url_for("glossary"))
+
+
+@app.route("/glossary/<int:section_id>/delete", methods=["POST"])
+def glossary_delete(section_id):
+    section = db.get_or_404(GlossarySection, section_id)
+    db.session.delete(section)
+    db.session.commit()
+    flash("Section deleted.", "success")
+    return redirect(url_for("glossary"))
+
+
+@app.route("/glossary/reorder", methods=["POST"])
+def glossary_reorder():
+    order = request.json.get("order", [])
+    for idx, sid in enumerate(order):
+        GlossarySection.query.filter_by(id=sid).update({"sort_order": idx})
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
 # --- SMTP Settings ---
@@ -807,8 +907,8 @@ def run_auto_scheduled_reports():
         queries = Query.query.filter_by(auto_run=True).all()
         triggered = 0
         for query in queries:
-            last_report = (db.session.query(Report)
-                           .filter(Report.query_id == query.id)
+            last_report = (Report.query
+                           .filter_by(query_id=query.id)
                            .order_by(Report.created_at.desc())
                            .first())
             interval_hours = {

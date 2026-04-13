@@ -66,7 +66,7 @@
             'google_ads': 'Google Ads', 'ads_tracker': 'Meta Ads',
             'sentiment': 'Sentiment', 'google_news': 'News', 'website_traffic': 'Traffic',
             'ai_visibility': 'AI Visibility', 'wayback_machine': 'Web Changes',
-            'linkedin_jobs': 'Jobs', 'ai_insights': 'AI Summary'
+            'linkedin_jobs': 'Jobs', 'reviews': 'Reviews', 'ai_insights': 'AI Summary'
         } %}
 
         {% if succeeded or failed %}
@@ -193,23 +193,6 @@
             </div>
             {% endif %}
         </div>
-        {% if insights.get('competitor_scores') %}
-        <div class="mt-5 pt-4 border-t border-brand/10">
-            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">ChatGPT Market Score</h4>
-            <div class="flex flex-wrap gap-3">
-                <div class="bg-white rounded-xl px-4 py-3 border border-brand/20 text-center min-w-[100px]">
-                    <div class="text-xl font-bold text-brand">{{ insights.overall_score }}<span class="text-xs text-gray-400">/100</span></div>
-                    <div class="text-xs text-gray-500 mt-0.5 font-medium">{{ client.name }}</div>
-                </div>
-                {% for comp_name, score in insights.competitor_scores.items() %}
-                <div class="bg-white rounded-xl px-4 py-3 border border-gray-200 text-center min-w-[100px]">
-                    <div class="text-xl font-bold text-gray-600">{{ score }}<span class="text-xs text-gray-400">/100</span></div>
-                    <div class="text-xs text-gray-500 mt-0.5">{{ comp_name }}</div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
     </div>
     {% endif %}
 
@@ -441,7 +424,45 @@
                 </tbody>
             </table>
         </div>
-        {% if ai_data %}
+        {% set ai_prompts = ai_data.get('_ai_prompts', []) %}
+        {% if ai_prompts %}
+        <div class="mt-6 pt-5 border-t border-gray-100">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="material-symbols-outlined text-purple-500 text-[20px]">auto_awesome</span>
+                <h3 class="text-sm font-semibold text-gray-700">Top AI Search Prompts</h3>
+                <span class="text-xs text-gray-400">Questions people ask AI assistants about this topic</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-100">
+                            <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">#</th>
+                            <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">AI Prompt / Question</th>
+                            <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Est. Volume</th>
+                            <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Competition</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in ai_prompts %}
+                        <tr class="border-b border-gray-50 hover:bg-purple-50/30 transition">
+                            <td class="py-2.5 px-3 text-gray-400 text-xs font-mono">{{ loop.index }}</td>
+                            <td class="py-2.5 px-3 text-gray-700 text-sm italic">"{{ p.get('prompt', '') }}"</td>
+                            <td class="py-2.5 px-3 text-right font-mono text-xs text-gray-600">
+                                {% if p.get('search_volume', 0) > 0 %}{{ '{:,}'.format(p.get('search_volume')) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                                {% set comp = p.get('competition', '') %}
+                                {% if comp == 'HIGH' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">High</span>
+                                {% elif comp == 'MEDIUM' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-600 border border-amber-200">Med</span>
+                                {% elif comp == 'LOW' %}<span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200">Low</span>
+                                {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
         {% endif %}
     </div>
     {% endif %}
@@ -477,7 +498,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Monthly Volume',
+                        label: 'Search Volume',
                         data: data,
                         backgroundColor: 'rgba(107, 81, 240, 0.15)',
                         borderColor: 'rgba(107, 81, 240, 0.8)',
@@ -621,7 +642,7 @@
         {# Brand sentiment first #}
         {% set has_brand_sentiment = namespace(val=false) %}
         {% for key, sd in sentiment_data.items() %}
-            {% if sd.get('is_brand') and sd.get('total_analyzed', 0) > 0 %}{% set has_brand_sentiment.val = true %}{% endif %}
+            {% if sd.get('is_brand') %}{% set has_brand_sentiment.val = true %}{% endif %}
         {% endfor %}
 
         {% if has_brand_sentiment.val %}
@@ -629,7 +650,7 @@
             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">By Brand</p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {% for key, sd in sentiment_data.items() %}
-            {% if sd.get('is_brand') and sd.get('total_analyzed', 0) > 0 %}
+            {% if sd.get('is_brand') %}
             <div class="border border-gray-100 rounded-xl p-4">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="font-semibold text-gray-700 text-sm">
@@ -641,7 +662,6 @@
                         {% if st == 'rising' %}<span class="text-emerald-500 font-bold text-sm" title="Positive sentiment trending up{% if stp %} {{ '%+.1f'|format(stp) }}%{% endif %}">↑{% if stp %}<span class="text-[9px] font-normal">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
                         {% elif st == 'declining' %}<span class="text-red-400 font-bold text-sm" title="Positive sentiment trending down{% if stp %} {{ '%+.1f'|format(stp) }}%{% endif %}">↓{% if stp %}<span class="text-[9px] font-normal">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
                         {% elif st == 'stable' %}<span class="text-amber-400 font-bold">—</span>{% endif %}
-                        <span class="text-xs text-gray-400">{{ sd.get('total_analyzed', 0) }} data points</span>
                     </div>
                 </div>
                 <div class="flex gap-2">
@@ -699,7 +719,6 @@
             <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
                 <div class="flex items-center justify-between mb-2">
                     <h3 class="font-semibold text-gray-700 text-sm">{{ kw }}</h3>
-                    <span class="text-xs text-gray-400">{{ sd.get('total_analyzed', 0) }} analyzed</span>
                 </div>
                 <div class="flex gap-2">
                     <div class="flex-1 bg-emerald-50 rounded-lg p-2 text-center"><p class="text-lg font-bold text-emerald-600">{{ sd.get('positive_pct', 0) }}%</p><p class="text-[10px] text-emerald-500">Positive</p></div>
@@ -747,7 +766,7 @@
                 <span class="text-xs text-gray-400 font-normal ml-2">{{ nd.get('article_count', 0) }} articles</span>
             </h3>
             <div class="space-y-2">
-                {% for article in nd.get('articles', [])[:5] %}
+                {% for article in nd.get('articles', [])[:10] %}
                 <div class="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 transition">
                     <span class="material-symbols-outlined text-gray-300 text-[16px] mt-0.5">article</span>
                     <div class="flex-1 min-w-0">
@@ -761,6 +780,12 @@
                 </div>
                 {% endfor %}
             </div>
+            {% set news_query = nd.get('query', '') %}
+            {% if news_query %}
+            <a href="https://news.google.com/search?q={{ news_query | urlencode }}" target="_blank" class="inline-flex items-center gap-1 mt-2 text-xs text-brand hover:underline">
+                <span class="material-symbols-outlined text-[13px]">open_in_new</span> View all on Google News
+            </a>
+            {% endif %}
         </div>
         {% endif %}
         {% endfor %}
@@ -854,7 +879,12 @@
             {% for key, ad in ads_data.items() %}
             {% if ad.get('ads') %}
             <div class="mb-3 pb-3 border-b border-gray-50 last:border-0">
-                <p class="text-xs font-semibold text-gray-500 mb-2">Ads for "{{ ad.get('search_term', key) }}" <span class="font-normal text-gray-400">({{ ad.get('total', 0) }} found)</span></p>
+                <p class="text-xs font-semibold text-gray-500 mb-2">
+                    {% if ad.get('entity_type') == 'client' %}🏢 {{ ad.get('org_name', ad.get('search_term', key)) }}
+                    {% elif ad.get('entity_type') == 'competitor' %}🏬 {{ ad.get('org_name', ad.get('search_term', key)) }}
+                    {% else %}🔍 Keyword: {{ ad.get('search_term', key) }}{% endif %}
+                    <span class="font-normal text-gray-400">({{ ad.get('total', 0) }} ads found)</span>
+                </p>
                 <div class="space-y-2">
                     {% for a in ad.get('ads', [])[:5] %}
                     <div class="flex items-center justify-between p-3 bg-blue-50/30 rounded-xl border border-blue-100 text-xs">
@@ -908,7 +938,7 @@
                     </div>
                     <div class="text-right">
                         <p class="text-gray-600 font-mono">${{ '%.2f'|format(gad.get('suggested_bid', 0)) }} bid</p>
-                        <p class="text-gray-400">{{ '{:,}'.format(gad.get('avg_monthly_searches', 0)) }} searches/mo</p>
+                        <p class="text-gray-400">{{ '{:,}'.format(gad.get('avg_monthly_searches', 0)) }} searches/period</p>
                     </div>
                 </div>
                 {% endif %}
@@ -955,6 +985,49 @@
                     {% endfor %}
                 </div>
                 {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {# ═══════════════════════════════════════
+       SECTION: REVIEWS
+    ═══════════════════════════════════════ #}
+    {% set reviews_data = kw_data.get('reviews', {}) %}
+    {% if reviews_data %}
+    {% set has_reviews = namespace(val=false) %}
+    {% for key, rd in reviews_data.items() %}{% if rd.get('reviews') or rd.get('avg_rating') %}{% set has_reviews.val = true %}{% endif %}{% endfor %}
+    {% if has_reviews.val %}
+    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
+        <div class="flex items-center gap-2 mb-5">
+            <span class="material-symbols-outlined text-yellow-500 text-[22px]">star</span>
+            <h2 class="text-lg font-semibold text-gray-800">Reviews</h2>
+        </div>
+        {% for key, rd in reviews_data.items() %}
+        {% if rd.get('reviews') or rd.get('avg_rating') %}
+        <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-gray-700 text-sm">
+                    {% if rd.get('entity_type') == 'client' %}🏢{% else %}🏬{% endif %}
+                    {{ rd.get('entity_name', key) }}
+                    {% if rd.get('platform') %}<span class="text-xs font-normal text-gray-400 ml-1">via {{ rd.get('platform') }}</span>{% endif %}
+                </h3>
+                <div class="flex items-center gap-3 text-xs text-gray-500">
+                    {% if rd.get('avg_rating') %}<span class="text-yellow-500 font-bold">★ {{ rd.get('avg_rating') }}</span>{% endif %}
+                    {% if rd.get('total_reviews', 0) > 0 %}<span>{{ rd.get('total_reviews') }} reviews</span>{% endif %}
+                    {% if rd.get('review_url') %}<a href="{{ rd.get('review_url') }}" target="_blank" class="text-brand hover:underline">View all →</a>{% endif %}
+                </div>
+            </div>
+            <div class="space-y-2">
+                {% for review in rd.get('reviews', [])[:5] %}
+                <div class="p-2.5 bg-yellow-50/40 rounded-lg border border-yellow-100 text-xs text-gray-600">
+                    {% if review.get('rating') %}<span class="text-yellow-500 mr-1">{% for i in range(review.get('rating', 0)|int) %}★{% endfor %}</span>{% endif %}
+                    "{{ review.get('text', '')[:200] }}"
+                </div>
+                {% endfor %}
             </div>
         </div>
         {% endif %}

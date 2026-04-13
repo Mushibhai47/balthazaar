@@ -90,12 +90,6 @@
     {% set insights = kw_data_pre.get('ai_insights', {}) %}
     {% if insights and insights.get('executive_summary') %}
     <div class="exec-block">
-        {% if insights.get('overall_score') %}
-        <div class="exec-score">
-            <div class="num">{{ insights.overall_score }}</div>
-            <div class="lbl">Market Score</div>
-        </div>
-        {% endif %}
         <div class="section-title">Executive Summary</div>
         <p style="color:#374151;font-size:12px;line-height:1.7;margin-bottom:14px;clear:none">{{ insights.executive_summary }}</p>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;clear:both;padding-top:4px">
@@ -234,6 +228,39 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        {# AI Prompts #}
+        {% set ai_prompts_p = ai_data_p.get('_ai_prompts', []) %}
+        {% if ai_prompts_p %}
+        <div style="margin-top:18px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#7c3aed;margin-bottom:8px">Top AI Search Prompts</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:30px">#</th>
+                        <th>Question / Prompt People Ask AI</th>
+                        <th style="text-align:right">Est. Volume</th>
+                        <th>Competition</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in ai_prompts_p %}
+                    <tr>
+                        <td style="color:#94a3b8;font-family:monospace">{{ loop.index }}</td>
+                        <td style="font-style:italic;color:#374151">"{{ p.get('prompt', '') }}"</td>
+                        <td style="text-align:right;font-family:monospace">{% if p.get('search_volume', 0) > 0 %}{{ '{:,}'.format(p.get('search_volume')) }}{% else %}—{% endif %}</td>
+                        <td>{% set c = p.get('competition', '') %}
+                            {% if c == 'HIGH' %}<span class="badge badge-red">High</span>
+                            {% elif c == 'MEDIUM' %}<span class="badge badge-amber">Med</span>
+                            {% elif c == 'LOW' %}<span class="badge badge-green">Low</span>
+                            {% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -281,13 +308,12 @@
     <div class="section">
         <div class="section-title">Online Sentiment</div>
         {% for key, sd in sentiment_data.items() %}
-        {% if sd is mapping and sd.get('total_analyzed', 0) > 0 %}
+        {% if sd is mapping and sd.get('is_brand') %}
         <div style="margin-bottom:12px;padding:10px;background:#F8F7FF;border-radius:8px;border:1px solid #EDE9FE">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="margin-bottom:6px">
                 <div style="font-weight:700;font-size:11px">{{ sd.get('brand_name', key) }}</div>
-                <div style="font-size:9px;color:#94a3b8">{{ sd.get('total_analyzed', 0) }} data points</div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center;margin-bottom:8px">
                 <div style="background:#f0fdf4;border-radius:6px;padding:6px">
                     <div style="font-weight:700;color:#16a34a;font-size:14px">{{ sd.get('positive_pct', 0) }}%</div>
                     <div style="font-size:8px;color:#94a3b8">Positive</div>
@@ -301,6 +327,22 @@
                     <div style="font-size:8px;color:#94a3b8">Negative</div>
                 </div>
             </div>
+            {% if sd.get('top_positive') %}
+            <div style="margin-bottom:6px">
+                <div style="font-size:8px;font-weight:700;color:#16a34a;margin-bottom:3px">TOP 5 POSITIVE</div>
+                {% for c in sd.get('top_positive', [])[:5] %}
+                <div style="font-size:9px;color:#374151;padding:3px 6px;background:#f0fdf4;border-radius:4px;margin-bottom:2px">"{{ ((c.get('text','') or c.get('title','')) | striptags)[:100] }}"{% if c.get('url') %} <a href="{{ c.url }}" style="color:#6B51F0">↗</a>{% elif c.get('link','').startswith('http') %} <a href="{{ c.link }}" style="color:#6B51F0">↗</a>{% endif %}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if sd.get('top_negative') %}
+            <div>
+                <div style="font-size:8px;font-weight:700;color:#dc2626;margin-bottom:3px">TOP 5 NEGATIVE</div>
+                {% for c in sd.get('top_negative', [])[:5] %}
+                <div style="font-size:9px;color:#374151;padding:3px 6px;background:#fef2f2;border-radius:4px;margin-bottom:2px">"{{ ((c.get('text','') or c.get('title','')) | striptags)[:100] }}"{% if c.get('url') %} <a href="{{ c.url }}" style="color:#6B51F0">↗</a>{% elif c.get('link','').startswith('http') %} <a href="{{ c.link }}" style="color:#6B51F0">↗</a>{% endif %}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
         {% endif %}
         {% endfor %}
@@ -321,14 +363,15 @@
         <div style="margin-bottom:14px">
             <div style="font-size:11px;font-weight:700;color:#6B51F0;margin-bottom:6px">{{ label }} <span style="font-weight:400;color:#94a3b8;font-size:9px">{{ nd.get('article_count', 0) }} articles</span></div>
             <ul class="news-list">
-                {% for a in nd.get('articles', [])[:4] %}
+                {% for a in nd.get('articles', [])[:10] %}
                 <li>
                     <div class="news-dot"></div>
-                    <div><div style="font-weight:600;color:#1a1a2e">{{ (a.get('title', '') or '')[:90] }}</div>
+                    <div><div style="font-weight:600;color:#1a1a2e">{% if a.get('link') %}<a href="{{ a.link }}" style="color:#1a1a2e;text-decoration:none">{{ (a.get('title', '') or '')[:90] }}</a>{% else %}{{ (a.get('title', '') or '')[:90] }}{% endif %}</div>
                     <div class="news-source">{{ a.get('source', '') }}{% if a.get('published') %} · {{ a.get('published', '')[:16] }}{% endif %}</div></div>
                 </li>
                 {% endfor %}
             </ul>
+            {% set news_q = nd.get('query', '') %}{% if news_q %}<div style="margin-top:4px;font-size:9px"><a href="https://news.google.com/search?q={{ news_q | urlencode }}" style="color:#6B51F0">View all on Google News →</a></div>{% endif %}
         </div>
         {% endif %}{% endif %}
         {% endfor %}
@@ -359,7 +402,7 @@
         <div class="section-title">Recruitment Activity</div>
         {% for key, entry in jobs_data.items() %}
         {% if entry is mapping and not entry.get('message') %}
-        {% set display_name = entry.get('name', key.replace('_competitor_','').replace('_client','client')) %}
+        {% set display_name = entry.get('company', entry.get('name', key.replace('_competitor_0_','').replace('_competitor_1_','').replace('_competitor_2_','').replace('_competitor_3_','').replace('_client','Client'))) %}
         {% set jobs = entry.get('recent_jobs', []) %}
         {% if display_name and display_name != '_info' %}
         <div style="margin-bottom:12px">
@@ -389,28 +432,138 @@
     </div>
     {% endif %}
 
+    <!-- YouTube Competitor Channels -->
+    {% set yt_data_p = kw_data.get('youtube', {}) %}
+    {% set has_channels_p = namespace(val=false) %}
+    {% for key, yd in yt_data_p.items() %}{% if yd.get('is_channel') and yd.get('videos') %}{% set has_channels_p.val = true %}{% endif %}{% endfor %}
+    {% if has_channels_p.val %}
+    <div class="section page-break">
+        <div class="section-title">Competitor Channel Activity — Top 5 by Engagement Rate</div>
+        {% set client_chs = [] %}{% set comp_chs = [] %}
+        {% for key, yd in yt_data_p.items() %}
+            {% if yd.get('is_channel') and yd.get('videos') %}
+                {% if yd.get('is_client') %}{% set _ = client_chs.append(yd) %}{% else %}{% set _ = comp_chs.append(yd) %}{% endif %}
+            {% endif %}
+        {% endfor %}
+        {% set comp_chs = comp_chs | sort(attribute='avg_engagement_rate', reverse=true) %}
+        {% for yd in (client_chs + comp_chs)[:5] %}
+        <div style="margin-bottom:14px">
+            <div style="font-weight:700;font-size:11px;color:{% if yd.get('is_client') %}#6B51F0{% else %}#1a1a2e{% endif %};margin-bottom:4px">
+                {% if yd.get('is_client') %}🏢{% else %}🏬{% endif %} {{ yd.get('company','') }}
+                <span style="font-weight:400;font-size:9px;color:#94a3b8">Avg Views: {{ '{:,}'.format(yd.get('avg_views',0)) }} · Avg Engagement: {{ yd.get('avg_engagement_rate',0) }}%</span>
+            </div>
+            <table>
+                <tbody>
+                {% for video in yd.get('videos',[])[:5] %}
+                <tr>
+                    <td style="max-width:280px">{{ (video.get('title',''))[:70] }}</td>
+                    <td style="text-align:right;font-family:monospace;width:80px">{{ '{:,}'.format(video.get('views',0)) }} views</td>
+                    <td style="text-align:right;color:#16a34a;width:60px">{{ video.get('engagement_rate',0) }}%</td>
+                    <td style="color:#94a3b8;font-size:9px;width:70px">{{ video.get('published','')[:10] }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Adverts -->
+    {% set ads_data_p = kw_data.get('ads_tracker', {}) %}
+    {% set google_ads_p = kw_data.get('google_ads', {}) %}
+    {% if ads_data_p or google_ads_p %}
+    <div class="section">
+        <div class="section-title">Adverts — Meta & Google</div>
+        {% set has_meta_p = namespace(val=false) %}
+        {% if ads_data_p %}{% for key, ad in ads_data_p.items() %}{% if ad.get('ads') %}{% set has_meta_p.val = true %}{% endif %}{% endfor %}{% endif %}
+        {% if has_meta_p.val %}
+        <div style="margin-bottom:12px">
+            <div style="font-size:10px;font-weight:700;color:#2563eb;margin-bottom:6px">Meta Ads (Facebook & Instagram)</div>
+            {% for key, ad in ads_data_p.items() %}{% if ad.get('ads') %}
+            <div style="margin-bottom:8px">
+                <div style="font-size:10px;font-weight:600;color:#374151;margin-bottom:3px">{{ ad.get('search_term', key) }} <span style="font-weight:400;color:#94a3b8">({{ ad.get('total',0) }} found)</span></div>
+                <table><tbody>
+                {% for a in ad.get('ads',[])[:3] %}
+                <tr>
+                    <td style="font-weight:600">{{ a.get('page_name','') }}</td>
+                    <td style="color:#94a3b8">Started: {{ a.get('started','—') }}</td>
+                    <td style="color:#94a3b8">{{ a.get('impressions','N/A') }} impressions</td>
+                </tr>
+                {% endfor %}
+                </tbody></table>
+            </div>
+            {% endif %}{% endfor %}
+        </div>
+        {% endif %}
+        {% set has_google_p = namespace(val=false) %}
+        {% if google_ads_p %}{% for kw, gad in google_ads_p.items() %}{% if gad.get('avg_monthly_searches',0) > 0 %}{% set has_google_p.val = true %}{% endif %}{% endfor %}{% endif %}
+        {% if has_google_p.val %}
+        <div>
+            <div style="font-size:10px;font-weight:700;color:#d97706;margin-bottom:6px">Google Search Ads</div>
+            <table><thead><tr><th>Keyword</th><th style="text-align:right">Searches/Period</th><th>Competition</th><th style="text-align:right">Bid</th></tr></thead>
+            <tbody>
+            {% for kw, gad in google_ads_p.items() %}{% if gad.get('avg_monthly_searches',0) > 0 %}
+            <tr>
+                <td style="font-weight:600">{{ kw }}</td>
+                <td style="text-align:right;font-family:monospace">{{ '{:,}'.format(gad.get('avg_monthly_searches',0)) }}</td>
+                <td>{{ gad.get('competition','—') }}</td>
+                <td style="text-align:right;font-family:monospace">${{ '%.2f'|format(gad.get('suggested_bid',0)) }}</td>
+            </tr>
+            {% endif %}{% endfor %}
+            </tbody></table>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Website Amendments -->
     {% set wayback_data = kw_data.get('wayback_machine', {}) %}
     {% if wayback_data %}
     <div class="section">
-        <div class="section-title">Website Change Monitoring (Last 30 Days)</div>
+        <div class="section-title">Website Amendments</div>
         {% for key, wdata in wayback_data.items() %}
-        {% if wdata is mapping and not wdata.get('message') %}
-        {% set display_name = wdata.get('label', key.replace('_competitor_','').replace('_client', client.name)) %}
+        {% if wdata is mapping and wdata.get('message', '') != 'No websites configured to monitor' %}
+        {% set display_name = wdata.get('label', key) %}
         <div style="margin-bottom:10px;padding:12px;background:#F8F7FF;border-radius:8px;border:1px solid #EDE9FE">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
                 <div style="font-weight:700;font-size:11px;color:#1a1a2e">{{ display_name }}</div>
-                <div style="font-size:10px;font-weight:700;
-                    {% if wdata.get('changes_detected', 0) > 0 %}color:#d97706{% else %}color:#94a3b8{% endif %}">
-                    {{ wdata.get('changes_detected', 0) }} change{{ 's' if wdata.get('changes_detected', 0) != 1 else '' }} detected
+                <div style="font-size:10px;font-weight:700;{% if wdata.get('snapshots', 0) > 0 %}color:#d97706{% else %}color:#94a3b8{% endif %}">
+                    {{ wdata.get('snapshots', 0) }} change{{ 's' if wdata.get('snapshots', 0) != 1 else '' }} detected
                 </div>
             </div>
-            {% if wdata.get('url') %}<div style="font-size:9px;color:#94a3b8">{{ wdata.get('url', '') }}</div>{% endif %}
+            {% if wdata.get('changes') %}
             {% for change in wdata.get('changes', [])[:3] %}
             <div style="margin-top:5px;font-size:10px;color:#374151;border-top:1px solid #EDE9FE;padding-top:4px">
                 <span style="color:#d97706;font-weight:600">{{ change.get('date', '') }}</span>
                 — {{ change.get('description', 'Page content updated') }}
             </div>
+            {% endfor %}
+            {% else %}
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px">{{ wdata.get('message', 'No changes during this period') | replace('No recent snapshots in last 30 days', 'No changes during this period') }}</div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Reviews -->
+    {% set reviews_data = kw_data.get('reviews', {}) %}
+    {% set has_reviews_p = namespace(val=false) %}
+    {% if reviews_data %}{% for key, rd in reviews_data.items() %}{% if rd.get('reviews') or rd.get('avg_rating') %}{% set has_reviews_p.val = true %}{% endif %}{% endfor %}{% endif %}
+    {% if has_reviews_p.val %}
+    <div class="section">
+        <div class="section-title">Reviews</div>
+        {% for key, rd in reviews_data.items() %}
+        {% if rd.get('reviews') or rd.get('avg_rating') %}
+        <div style="margin-bottom:12px;padding:10px;background:#FEFCE8;border-radius:8px;border:1px solid #FEF08A">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <div style="font-weight:700;font-size:11px">{{ rd.get('entity_name', key) }}{% if rd.get('platform') %} <span style="font-weight:400;color:#94a3b8">({{ rd.get('platform') }})</span>{% endif %}</div>
+                <div style="font-size:10px;color:#d97706">{% if rd.get('avg_rating') %}★ {{ rd.get('avg_rating') }}{% endif %} {% if rd.get('total_reviews', 0) > 0 %}({{ rd.get('total_reviews') }} reviews){% endif %}</div>
+            </div>
+            {% for review in rd.get('reviews', [])[:3] %}
+            <div style="font-size:9px;color:#374151;padding:4px 6px;background:white;border-radius:4px;margin-bottom:3px;border:1px solid #FEF08A">{% if review.get('rating') %}{{ '★' * (review.get('rating', 0)|int) }} {% endif %}"{{ review.get('text', '')[:150] }}"</div>
             {% endfor %}
         </div>
         {% endif %}

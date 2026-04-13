@@ -39,6 +39,7 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
         super().__init__(credentials)
         self.email = credentials.get('email', '')
         self.password = credentials.get('password', '')
+        self.bearer_token = credentials.get('bearer_token', '')
         self.client_name = credentials.get('_client_name', '')
         self.client_website = credentials.get('_client_website', '')
         self.competitors = credentials.get('_competitors', [])
@@ -49,11 +50,16 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
             'Referer': 'https://app.neilpatel.com/',
             'Origin': 'https://app.neilpatel.com',
         })
+        if self.bearer_token:
+            self.session.headers.update({'Authorization': f'Bearer {self.bearer_token}'})
         self._logged_in = False
         self._working_prefix = None
 
     def _login(self) -> bool:
         if self._logged_in:
+            return True
+        if self.bearer_token:
+            self._logged_in = True
             return True
         if not self.email or not self.password:
             return False
@@ -172,7 +178,6 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
         return result
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
-        # AI Search Visibility requires Ubersuggest paid plan — return placeholder data
         results = {}
         domains = []
         if self.client_website:
@@ -183,20 +188,23 @@ class UbersuggestAIVisibilityCollector(BaseKeywordCollector):
             if website:
                 domains.append((website, name, 'competitor'))
 
+        if not domains:
+            return results
+
+        # Try to login and fetch real data
+        logged_in = self._login()
         for website, label, entity_type in domains:
-            domain = _clean_domain(website)
             key = 'client' if entity_type == 'client' else f"competitor_{label}"
-            results[key] = {
-                'domain': domain,
-                'label': label,
-                'type': entity_type,
-                'brand_visibility_pct': 0,
-                'industry_rank': None,
-                'total_analyzed': 0,
-                'top_prompts': [],
-                'competitor_comparison': [],
-                'error': 'Requires Ubersuggest paid plan',
-            }
+            if logged_in:
+                results[key] = self._fetch_ai_visibility(website, label, entity_type)
+            else:
+                domain = _clean_domain(website)
+                results[key] = {
+                    'domain': domain, 'label': label, 'type': entity_type,
+                    'brand_visibility_pct': 0, 'industry_rank': None,
+                    'total_analyzed': 0, 'top_prompts': [], 'competitor_comparison': [],
+                    'error': 'Could not authenticate with Ubersuggest',
+                }
         return results
 
     def validate_credentials(self) -> bool:

@@ -79,6 +79,7 @@ COLLECTORS_CONFIG = [
     {"name": "google_news",     "module": "sources.google_news",        "class": "GoogleNewsCollector",     "credentials_required": False},
     {"name": "wayback_machine", "module": "sources.wayback_machine",    "class": "WaybackMachineCollector", "credentials_required": False},
     {"name": "linkedin_jobs",   "module": "sources.linkedin_jobs",      "class": "LinkedInJobsCollector",   "credentials_required": False},
+    {"name": "reviews",         "module": "sources.reviews_collector",  "class": "ReviewsCollector",        "credentials_required": False},
     # AI Executive Summary — runs last, requires OpenAI
     {"name": "ai_insights",     "module": "sources.ai_insights",        "class": "AIInsightsCollector",     "credentials_required": True,  "use_credentials_from": "openai"},
 ]
@@ -436,11 +437,14 @@ def _do_generate_report(report_id: int, country_override: str = None):
             context = {
                 '_client_name': client.name,
                 '_client_website': client.website,
+                '_client_youtube': getattr(client, 'youtube_url', '') or '',
+                '_client_review_url': getattr(client, 'review_page_url', '') or '',
                 '_competitors': [
                     {
                         'name': c.name,
                         'website': c.website,
-                        'youtube_url': c.youtube_url or ''
+                        'youtube_url': c.youtube_url or '',
+                        'review_page_url': getattr(c, 'review_page_url', '') or ''
                     }
                     for c in client.competitors
                 ]

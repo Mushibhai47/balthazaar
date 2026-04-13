@@ -27,18 +27,30 @@ class AdsTrackerCollector(BaseKeywordCollector):
         results = {}
         country_code = self._country_to_code(countries[0] if countries else 'United States')
 
-        # Meta Ad Library - search by keyword and competitor names
-        search_terms = keywords[:3] + [c.get('name', '') for c in self.competitors[:2] if c.get('name')]
+        # Client brand ads first
+        if self.client_name:
+            meta_ads = self._fetch_meta_ads(self.client_name, country_code)
+            meta_ads['entity_type'] = 'client'
+            meta_ads['org_name'] = self.client_name
+            results[f"meta_{self.client_name}"] = meta_ads
 
-        for term in search_terms:
-            if not term:
+        # Competitor brand ads
+        for comp in self.competitors[:4]:
+            name = comp.get('name', '')
+            if name and name != self.client_name:
+                meta_ads = self._fetch_meta_ads(name, country_code)
+                meta_ads['entity_type'] = 'competitor'
+                meta_ads['org_name'] = name
+                results[f"meta_{name}"] = meta_ads
+
+        # Keyword-based ads (top 3 keywords)
+        for term in keywords[:3]:
+            if not term or term in [self.client_name] + [c.get('name','') for c in self.competitors]:
                 continue
             meta_ads = self._fetch_meta_ads(term, country_code)
-            results[f"meta_{term}"] = meta_ads
-
-        # Client brand ads
-        if self.client_name:
-            results[f"meta_{self.client_name}"] = self._fetch_meta_ads(self.client_name, country_code)
+            meta_ads['entity_type'] = 'keyword'
+            meta_ads['org_name'] = ''
+            results[f"meta_kw_{term}"] = meta_ads
 
         return results
 

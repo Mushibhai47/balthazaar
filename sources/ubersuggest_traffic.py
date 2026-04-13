@@ -100,13 +100,15 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
             latest_month = max(domain_traffic.keys()) if domain_traffic else None
             latest = domain_traffic.get(latest_month, {}) if latest_month else {}
 
+            organic = data.get('traffic', latest.get('searchTraffic', 0)) or 0
+            paid = data.get('paidTraffic', latest.get('paidTraffic', 0)) or 0
             return {
                 'domain': domain,
                 'label': label,
                 'type': entity_type,
-                'organic_monthly': data.get('traffic', latest.get('searchTraffic', 0)),
-                'paid_monthly': data.get('paidTraffic', latest.get('paidTraffic', 0)),
-                'total_monthly': data.get('traffic', 0),
+                'organic_monthly': organic,
+                'paid_monthly': paid,
+                'total_monthly': organic + paid,
                 'domain_score': data.get('domainAuthority', 0),
                 'backlinks': data.get('backlinks', 0),
                 'keywords_count': data.get('organic', 0),

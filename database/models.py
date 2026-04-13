@@ -18,6 +18,7 @@ class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     website = db.Column(db.String(500), nullable=False)
+    youtube_url = db.Column(db.String(500), default="")
     social_handles = db.Column(db.Text, default="[]")  # JSON list
     contact_name = db.Column(db.String(255), nullable=False)
     contact_email = db.Column(db.String(255), nullable=False)
@@ -181,3 +182,26 @@ class APICredential(db.Model):
             return json.loads(decoded)
         except Exception as e:
             raise ValueError(f"Could not decrypt credentials for {self.service_name}: {e}")
+
+
+class GlossarySection(db.Model):
+    __tablename__ = "glossary_sections"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    source = db.Column(db.String(255), default="")
+    description = db.Column(db.Text, default="")
+    fields = db.Column(db.Text, default="[]")  # JSON list of field descriptions
+    icon = db.Column(db.String(100), default="info")
+    color = db.Column(db.String(100), default="text-brand")
+    sort_order = db.Column(db.Integer, default=0)
+    is_active = db.Column(db.Boolean, default=True)
+
+    def get_fields(self):
+        try:
+            return json.loads(self.fields) if self.fields else []
+        except Exception:
+            return []
+
+    def set_fields(self, fields_list):
+        self.fields = json.dumps(fields_list)

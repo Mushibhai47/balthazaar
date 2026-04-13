@@ -24,6 +24,7 @@ class YouTubeCollector(BaseKeywordCollector):
         self.youtube = build('youtube', 'v3', developerKey=self.api_key)
         self.competitors = credentials.get('_competitors', [])
         self.client_name = credentials.get('_client_name', '')
+        self.client_youtube = credentials.get('_client_youtube', '')
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
         """
@@ -73,9 +74,8 @@ class YouTubeCollector(BaseKeywordCollector):
 
         # Client channel too
         if self.client_name:
-            client_comp = {'name': self.client_name, 'youtube_url': ''}
             try:
-                results['_channel_client'] = self._get_channel_videos(self.client_name, '')
+                results['_channel_client'] = self._get_channel_videos(self.client_name, self.client_youtube)
                 results['_channel_client']['is_client'] = True
             except Exception as e:
                 logger.warning(f"Client channel fetch failed: {e}")
@@ -85,6 +85,7 @@ class YouTubeCollector(BaseKeywordCollector):
     def _get_channel_videos(self, company_name: str, youtube_url: str) -> Dict[str, Any]:
         """Fetch recent videos from a competitor/client YouTube channel"""
         channel_id = None
+        url_was_provided = bool(youtube_url and youtube_url.strip())
 
         # Try to extract channel ID from URL
         import re as _re
@@ -92,6 +93,8 @@ class YouTubeCollector(BaseKeywordCollector):
             channel_match = _re.search(r'channel/(UC[\w-]+)', youtube_url)
             handle_match = _re.search(r'@([\w.-]+)', youtube_url)
             user_match = _re.search(r'/user/([\w.-]+)', youtube_url)
+            # Support /c/channelname legacy format
+            c_match = _re.search(r'/c/([\w.-]+)', youtube_url) if not handle_match else None
 
             if channel_match:
                 channel_id = channel_match.group(1)
@@ -106,14 +109,14 @@ class YouTubeCollector(BaseKeywordCollector):
                         channel_id = ch_resp['items'][0]['id']
                 except Exception:
                     pass
-                # Fallback: search by handle text
+                # Fallback: forUsername with handle (some channels use this)
                 if not channel_id:
                     try:
-                        search_resp = self.youtube.search().list(
-                            q=handle, part='snippet', type='channel', maxResults=1
+                        ch_resp = self.youtube.channels().list(
+                            forUsername=handle, part='id'
                         ).execute()
-                        if search_resp.get('items'):
-                            channel_id = search_resp['items'][0]['snippet']['channelId']
+                        if ch_resp.get('items'):
+                            channel_id = ch_resp['items'][0]['id']
                     except Exception:
                         pass
             elif user_match:
@@ -125,9 +128,35 @@ class YouTubeCollector(BaseKeywordCollector):
                         channel_id = ch_resp['items'][0]['id']
                 except Exception:
                     pass
+            elif c_match:
+                # /c/channelname — try forUsername then forHandle
+                slug = c_match.group(1)
+                try:
+                    ch_resp = self.youtube.channels().list(
+                        forUsername=slug, part='id'
+                    ).execute()
+                    if ch_resp.get('items'):
+                        channel_id = ch_resp['items'][0]['id']
+                except Exception:
+                    pass
+                if not channel_id:
+                    try:
+                        ch_resp = self.youtube.channels().list(
+                            forHandle=f'@{slug}', part='id'
+                        ).execute()
+                        if ch_resp.get('items'):
+                            channel_id = ch_resp['items'][0]['id']
+                    except Exception:
+                        pass
 
-        # If no channel ID yet, search by company name
-        if not channel_id:
+            # If URL was given but we still couldn't resolve, don't fall back to name search
+            if url_was_provided and not channel_id:
+                logger.warning(f"Could not resolve YouTube channel from URL: {youtube_url}")
+                return {'company': company_name, 'videos': [], 'total_videos': 0, 'is_channel': True,
+                        'error': f'Could not resolve channel from URL: {youtube_url}'}
+
+        # If no URL provided, search by company name as best-effort
+        if not channel_id and not url_was_provided:
             try:
                 search_resp = self.youtube.search().list(
                     q=f"{company_name} official", part='snippet', type='channel', maxResults=1
