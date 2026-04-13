@@ -308,7 +308,7 @@
     <div class="section">
         <div class="section-title">Online Sentiment</div>
         {% for key, sd in sentiment_data.items() %}
-        {% if sd is mapping and sd.get('total_analyzed', 0) > 0 %}
+        {% if sd is mapping and sd.get('is_brand') %}
         <div style="margin-bottom:12px;padding:10px;background:#F8F7FF;border-radius:8px;border:1px solid #EDE9FE">
             <div style="margin-bottom:6px">
                 <div style="font-weight:700;font-size:11px">{{ sd.get('brand_name', key) }}</div>
@@ -363,14 +363,15 @@
         <div style="margin-bottom:14px">
             <div style="font-size:11px;font-weight:700;color:#6B51F0;margin-bottom:6px">{{ label }} <span style="font-weight:400;color:#94a3b8;font-size:9px">{{ nd.get('article_count', 0) }} articles</span></div>
             <ul class="news-list">
-                {% for a in nd.get('articles', [])[:4] %}
+                {% for a in nd.get('articles', [])[:10] %}
                 <li>
                     <div class="news-dot"></div>
-                    <div><div style="font-weight:600;color:#1a1a2e">{{ (a.get('title', '') or '')[:90] }}</div>
+                    <div><div style="font-weight:600;color:#1a1a2e">{% if a.get('link') %}<a href="{{ a.link }}" style="color:#1a1a2e;text-decoration:none">{{ (a.get('title', '') or '')[:90] }}</a>{% else %}{{ (a.get('title', '') or '')[:90] }}{% endif %}</div>
                     <div class="news-source">{{ a.get('source', '') }}{% if a.get('published') %} · {{ a.get('published', '')[:16] }}{% endif %}</div></div>
                 </li>
                 {% endfor %}
             </ul>
+            {% set news_q = nd.get('query', '') %}{% if news_q %}<div style="margin-top:4px;font-size:9px"><a href="https://news.google.com/search?q={{ news_q | urlencode }}" style="color:#6B51F0">View all on Google News →</a></div>{% endif %}
         </div>
         {% endif %}{% endif %}
         {% endfor %}
@@ -401,7 +402,7 @@
         <div class="section-title">Recruitment Activity</div>
         {% for key, entry in jobs_data.items() %}
         {% if entry is mapping and not entry.get('message') %}
-        {% set display_name = entry.get('name', key.replace('_competitor_','').replace('_client','client')) %}
+        {% set display_name = entry.get('company', entry.get('name', key.replace('_competitor_0_','').replace('_competitor_1_','').replace('_competitor_2_','').replace('_competitor_3_','').replace('_client','Client'))) %}
         {% set jobs = entry.get('recent_jobs', []) %}
         {% if display_name and display_name != '_info' %}
         <div style="margin-bottom:12px">
@@ -541,6 +542,29 @@
             {% else %}
             <div style="font-size:10px;color:#94a3b8;margin-top:4px">{{ wdata.get('message', 'No changes during this period') | replace('No recent snapshots in last 30 days', 'No changes during this period') }}</div>
             {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Reviews -->
+    {% set reviews_data = kw_data.get('reviews', {}) %}
+    {% set has_reviews_p = namespace(val=false) %}
+    {% if reviews_data %}{% for key, rd in reviews_data.items() %}{% if rd.get('reviews') or rd.get('avg_rating') %}{% set has_reviews_p.val = true %}{% endif %}{% endfor %}{% endif %}
+    {% if has_reviews_p.val %}
+    <div class="section">
+        <div class="section-title">Reviews</div>
+        {% for key, rd in reviews_data.items() %}
+        {% if rd.get('reviews') or rd.get('avg_rating') %}
+        <div style="margin-bottom:12px;padding:10px;background:#FEFCE8;border-radius:8px;border:1px solid #FEF08A">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <div style="font-weight:700;font-size:11px">{{ rd.get('entity_name', key) }}{% if rd.get('platform') %} <span style="font-weight:400;color:#94a3b8">({{ rd.get('platform') }})</span>{% endif %}</div>
+                <div style="font-size:10px;color:#d97706">{% if rd.get('avg_rating') %}★ {{ rd.get('avg_rating') }}{% endif %} {% if rd.get('total_reviews', 0) > 0 %}({{ rd.get('total_reviews') }} reviews){% endif %}</div>
+            </div>
+            {% for review in rd.get('reviews', [])[:3] %}
+            <div style="font-size:9px;color:#374151;padding:4px 6px;background:white;border-radius:4px;margin-bottom:3px;border:1px solid #FEF08A">{% if review.get('rating') %}{{ '★' * (review.get('rating', 0)|int) }} {% endif %}"{{ review.get('text', '')[:150] }}"</div>
+            {% endfor %}
         </div>
         {% endif %}
         {% endfor %}

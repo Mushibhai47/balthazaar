@@ -32,9 +32,17 @@ class WaybackMachineCollector(BaseKeywordCollector):
         # Check competitor websites
         for idx, comp in enumerate(self.competitors[:5]):
             website = comp.get('website', '')
-            name = comp.get('name') or website  # fallback to URL if name is empty
+            name = comp.get('name') or website or f'Competitor {idx + 1}'
+            key = f"_competitor_{idx}_{name}"
             if website:
-                results[f"_competitor_{idx}_{name}"] = self._check_website(website, 'competitor', name)
+                results[key] = self._check_website(website, 'competitor', name)
+            else:
+                results[key] = {
+                    'snapshots': 0, 'changes': [],
+                    'message': 'No website configured for this competitor',
+                    'source': 'wayback_machine', 'type': 'competitor',
+                    'label': name, 'url': ''
+                }
 
         if not results:
             results['_info'] = {
