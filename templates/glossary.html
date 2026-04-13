@@ -33,7 +33,7 @@
                         <h2 class="text-base font-semibold text-gray-900">{{ s.title }}</h2>
                         <div class="flex items-center gap-2">
                             <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">{{ s.source }}</span>
-                            <button onclick="openEdit({{ s.id }}, {{ s | tojson }})"
+                            <button onclick="openEdit({{ s.id }}, {{ {'title': s.title, 'source': s.source, 'description': s.description, 'icon': s.icon, 'color': s.color, 'fields': s.fields} | tojson }})"
                                 class="text-gray-400 hover:text-brand transition no-print">
                                 <span class="material-symbols-outlined text-[16px]">edit</span>
                             </button>

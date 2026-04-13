@@ -7,6 +7,7 @@ from datetime import datetime
 import json
 import secrets
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -47,41 +48,6 @@ def seed_default_tiers():
             db.session.add(tier)
         db.session.commit()
 
-with app.app_context():
-    db.create_all()
-    seed_default_tiers()
-    # Migration: add portal_token column if it doesn't exist yet
-    try:
-        from sqlalchemy import text
-        with db.engine.connect() as conn:
-            conn.execute(text("ALTER TABLE clients ADD COLUMN portal_token VARCHAR(64)"))
-            conn.commit()
-    except Exception:
-        pass  # Column already exists
-    try:
-        from sqlalchemy import text
-        with db.engine.connect() as conn:
-            conn.execute(text("ALTER TABLE clients ADD COLUMN report_recipients TEXT DEFAULT '[]'"))
-            conn.commit()
-    except Exception:
-        pass  # Column already exists
-    try:
-        from sqlalchemy import text
-        with db.engine.connect() as conn:
-            conn.execute(text("ALTER TABLE reports ADD COLUMN country VARCHAR(100)"))
-            conn.commit()
-    except Exception:
-        pass  # Column already exists
-    try:
-        from sqlalchemy import text
-        with db.engine.connect() as conn:
-            conn.execute(text("ALTER TABLE clients ADD COLUMN youtube_url VARCHAR(500) DEFAULT ''"))
-            conn.commit()
-    except Exception:
-        pass  # Column already exists
-    seed_default_glossary()
-
-
 DEFAULT_GLOSSARY = [
     {'icon': 'psychology', 'color': 'text-brand', 'title': 'ChatGPT Overall Market Score', 'source': 'Powered by OpenAI GPT-4o', 'description': 'A score from 0–100 reflecting the overall competitive strength of a brand. Calculated by GPT-4o after analysing keyword trends, search volume, competition levels, CPC data, news sentiment, and competitor activity. A higher score indicates stronger market presence and opportunity. Scores are generated for the client and each selected competitor independently.', 'fields': ['0–40: Weak market presence', '41–65: Moderate, room to grow', '66–80: Strong competitive position', '81–100: Market leader']},
     {'icon': 'search', 'color': 'text-indigo-500', 'title': 'Keyword Volume & Trends', 'source': 'OpenAI / Google Gemini', 'description': 'Monthly search volume estimates for each tracked keyword. Trend direction (↑ rising / — stable / ↓ declining) reflects whether search interest is increasing or decreasing. CPC (Cost Per Click) shows the estimated advertising cost for that keyword.', 'fields': ['Volume: estimated monthly searches', 'Avg. Volume: 6-month average', 'CPC: estimated Google Ads cost per click', 'Competition: LOW / MEDIUM / HIGH']},
@@ -108,6 +74,41 @@ def seed_default_glossary():
         db.session.commit()
 
 
+with app.app_context():
+    db.create_all()
+    seed_default_tiers()
+    # Migrations
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE clients ADD COLUMN portal_token VARCHAR(64)"))
+            conn.commit()
+    except Exception:
+        pass
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE clients ADD COLUMN report_recipients TEXT DEFAULT '[]'"))
+            conn.commit()
+    except Exception:
+        pass
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE reports ADD COLUMN country VARCHAR(100)"))
+            conn.commit()
+    except Exception:
+        pass
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE clients ADD COLUMN youtube_url VARCHAR(500) DEFAULT ''"))
+            conn.commit()
+    except Exception:
+        pass
+    seed_default_glossary()
+
+
 # --- Dashboard ---
 @app.route("/")
 def dashboard():
@@ -115,7 +116,7 @@ def dashboard():
     total_reports = db.session.query(func.count(Report.id)).scalar() or 0
     total_competitors = db.session.query(func.count(Competitor.id)).scalar() or 0
     total_queries = db.session.query(func.count(Query.id)).scalar() or 0
-    recent_reports = (Report.query
+    recent_reports = (db.session.query(Report)
         .filter_by(status='complete')
         .order_by(Report.generated_at.desc())
         .limit(5).all())
@@ -296,11 +297,13 @@ def edit_client(client_id):
         comp_name = request.form.get(f"comp_name_{comp.id}", "").strip()
         comp_website = request.form.get(f"comp_website_{comp.id}", "").strip()
         comp_youtube = request.form.get(f"comp_youtube_{comp.id}", "").strip()
+        comp_review = request.form.get(f"comp_review_{comp.id}", "").strip()
         if comp_name:
             comp.name = comp_name
         if comp_website:
             comp.website = comp_website
         comp.youtube_url = comp_youtube
+        comp.review_page_url = comp_review
 
     db.session.commit()
     flash(f"Client '{client.name}' updated.", "success")

@@ -131,6 +131,12 @@
                             <input type="url" name="comp_youtube_{{ comp.id }}" value="{{ comp.youtube_url or '' }}"
                                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-200 outline-none transition">
                         </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Review Page URL <span class="text-gray-400 font-normal">(Trustpilot, Google, etc.)</span></label>
+                            <input type="url" name="comp_review_{{ comp.id }}" value="{{ comp.review_page_url or '' }}"
+                                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-200 outline-none transition"
+                                placeholder="https://uk.trustpilot.com/review/competitor.com">
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
