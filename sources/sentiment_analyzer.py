@@ -116,6 +116,9 @@ class SentimentCollector(BaseKeywordCollector):
             for entry in feed.entries[:15]:
                 text = entry.get('summary', entry.get('title', ''))
                 if text:
+                    import re as _re
+                    text = _re.sub(r'<[^>]+>', '', text).strip()
+                if text:
                     texts.append({'text': text[:300], 'title': entry.get('title', ''),
                                   'link': entry.get('link', ''), 'source': entry.get('source', {}).get('title', '')})
             return texts

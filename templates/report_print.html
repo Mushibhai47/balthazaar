@@ -173,7 +173,7 @@
             </thead>
             <tbody>
                 {% for key, td in traffic_data.items() %}
-                {% if not td.get('error') and td is mapping %}
+                {% if td is mapping %}
                 <tr>
                     <td style="font-weight:600">{{ td.get('label', td.get('domain', key)) }}</td>
                     <td style="text-align:right;font-family:monospace;color:#16a34a">{{ '{:,}'.format(td.get('organic_monthly', 0)) }}</td>
