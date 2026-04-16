@@ -734,7 +734,7 @@ def admin():
     total_reports = db.session.query(func.count(Report.id)).scalar() or 0
     credentials = APICredential.query.all()
     glossary_count = GlossarySection.query.filter_by(is_active=True).count()
-    recent_reports = (Report.query
+    recent_reports = (db.session.query(Report)
         .order_by(Report.created_at.desc())
         .limit(10).all())
     return render_template("admin.html",
@@ -929,7 +929,7 @@ def run_auto_scheduled_reports():
         queries = Query.query.filter_by(auto_run=True).all()
         triggered = 0
         for query in queries:
-            last_report = (Report.query
+            last_report = (db.session.query(Report)
                            .filter_by(query_id=query.id)
                            .order_by(Report.created_at.desc())
                            .first())
