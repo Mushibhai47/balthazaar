@@ -727,6 +727,25 @@ def save_links():
     return redirect(url_for("settings"))
 
 
+# --- Admin Panel ---
+@app.route("/admin")
+def admin():
+    clients = Client.query.order_by(Client.created_at.desc()).all()
+    total_reports = db.session.query(func.count(Report.id)).scalar() or 0
+    credentials = APICredential.query.all()
+    glossary_count = GlossarySection.query.filter_by(is_active=True).count()
+    recent_reports = (Report.query
+        .order_by(Report.created_at.desc())
+        .limit(10).all())
+    return render_template("admin.html",
+        clients=clients,
+        total_reports=total_reports,
+        credentials=credentials,
+        glossary_count=glossary_count,
+        recent_reports=recent_reports,
+    )
+
+
 # --- Glossary / How It Works ---
 @app.route("/glossary")
 def glossary():
