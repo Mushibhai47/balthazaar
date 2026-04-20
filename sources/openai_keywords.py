@@ -53,7 +53,7 @@ class OpenAICollector(BaseKeywordCollector):
 
             # Call OpenAI API
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "system",
@@ -178,7 +178,7 @@ Return ONLY valid JSON in this exact format:
 }}"""
 
         response = self.client.chat.completions.create(
-            model="gpt-4-turbo-preview",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are an AI search trends analyst. Return only valid JSON."},
                 {"role": "user", "content": prompt}
