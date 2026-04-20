@@ -78,13 +78,14 @@
                 ('smtp', 'Email (SMTP)', 'mail'),
             ] %}
             {% for svc, label, icon in services %}
-            {% set cred = credentials | selectattr('service_name', 'equalto', svc) | first %}
-            <div class="flex items-center gap-3 p-3 rounded-xl border {% if cred and cred.is_active %}border-emerald-200 bg-emerald-50{% else %}border-gray-100 bg-gray-50{% endif %}">
-                <span class="material-symbols-outlined text-[20px] {% if cred and cred.is_active %}text-emerald-600{% else %}text-gray-300{% endif %}">{{ icon }}</span>
+            {% set cred_found = namespace(obj=none) %}
+            {% for c in credentials %}{% if c.service_name == svc %}{% set cred_found.obj = c %}{% endif %}{% endfor %}
+            <div class="flex items-center gap-3 p-3 rounded-xl border {% if cred_found.obj and cred_found.obj.is_active %}border-emerald-200 bg-emerald-50{% else %}border-gray-100 bg-gray-50{% endif %}">
+                <span class="material-symbols-outlined text-[20px] {% if cred_found.obj and cred_found.obj.is_active %}text-emerald-600{% else %}text-gray-300{% endif %}">{{ icon }}</span>
                 <div>
                     <div class="text-xs font-semibold text-gray-700">{{ label }}</div>
-                    <div class="text-[10px] {% if cred and cred.is_active %}text-emerald-600{% else %}text-gray-400{% endif %}">
-                        {% if cred and cred.is_active %}Configured{% else %}Not set{% endif %}
+                    <div class="text-[10px] {% if cred_found.obj and cred_found.obj.is_active %}text-emerald-600{% else %}text-gray-400{% endif %}">
+                        {% if cred_found.obj and cred_found.obj.is_active %}Configured{% else %}Not set{% endif %}
                     </div>
                 </div>
             </div>
@@ -120,7 +121,7 @@
                 <tbody>
                     {% for client in clients %}
                     {% set comp_with_reviews = client.competitors | selectattr('review_page_url') | list %}
-                    {% set report_count = client.queries | map(attribute='reports') | sum(start=[]) | list | length %}
+                    {% set report_count = client_report_counts.get(client.id, 0) %}
                     <tr class="border-b border-gray-50 hover:bg-brand/5 transition">
                         <td class="py-3 px-3">
                             <a href="/clients/{{ client.id }}" class="font-semibold text-gray-800 hover:text-brand">{{ client.name }}</a>

@@ -31,14 +31,22 @@
                 <div class="flex-1">
                     <div class="flex items-center justify-between flex-wrap gap-2 mb-1">
                         <h2 class="text-base font-semibold text-gray-900">{{ s.title }}</h2>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1">
                             <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">{{ s.source }}</span>
-                            <button onclick="openEdit({{ s.id }}, {{ {'title': s.title, 'source': s.source, 'description': s.description, 'icon': s.icon, 'color': s.color, 'fields': s.fields} | tojson }})"
-                                class="text-gray-400 hover:text-brand transition no-print">
+                            <button onclick="moveSection({{ s.id }}, 'up')" title="Move up"
+                                class="text-gray-300 hover:text-brand transition no-print px-1">
+                                <span class="material-symbols-outlined text-[16px]">arrow_upward</span>
+                            </button>
+                            <button onclick="moveSection({{ s.id }}, 'down')" title="Move down"
+                                class="text-gray-300 hover:text-brand transition no-print px-1">
+                                <span class="material-symbols-outlined text-[16px]">arrow_downward</span>
+                            </button>
+                            <button onclick="openEdit({{ s.id }}, {{ s | tojson }})"
+                                class="text-gray-400 hover:text-brand transition no-print px-1">
                                 <span class="material-symbols-outlined text-[16px]">edit</span>
                             </button>
                             <form action="/glossary/{{ s.id }}/delete" method="post" onsubmit="return confirm('Delete this section?')" class="inline no-print">
-                                <button type="submit" class="text-gray-400 hover:text-red-500 transition">
+                                <button type="submit" class="text-gray-400 hover:text-red-500 transition px-1">
                                     <span class="material-symbols-outlined text-[16px]">delete</span>
                                 </button>
                             </form>
@@ -155,10 +163,26 @@ function openEdit(id, data) {
     document.getElementById('editDescription').value = data.description || '';
     document.getElementById('editIcon').value = data.icon || 'info';
     document.getElementById('editColor').value = data.color || 'text-brand';
-    // Fields: parse the JSON fields array and join with newlines
     const fields = data.fields ? JSON.parse(data.fields) : [];
     document.getElementById('editFields').value = Array.isArray(fields) ? fields.join('\n') : fields;
     document.getElementById('editModal').classList.remove('hidden');
+}
+
+function moveSection(id, direction) {
+    const list = document.getElementById('glossaryList');
+    const items = Array.from(list.children);
+    const ids = items.map(el => parseInt(el.dataset.id));
+    const idx = ids.indexOf(id);
+    if (direction === 'up' && idx > 0) {
+        ids.splice(idx - 1, 0, ids.splice(idx, 1)[0]);
+    } else if (direction === 'down' && idx < ids.length - 1) {
+        ids.splice(idx + 1, 0, ids.splice(idx, 1)[0]);
+    } else { return; }
+    fetch('/glossary/reorder', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({order: ids})
+    }).then(() => location.reload());
 }
 </script>
 {% endblock %}

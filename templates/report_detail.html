@@ -15,7 +15,7 @@
         <div class="flex items-start justify-between flex-wrap gap-4">
             <div>
                 <div class="flex items-center gap-3 mb-2 flex-wrap">
-                    <h1 class="text-2xl font-bold text-gray-900">Report #{{ report.id }}</h1>
+                    <h1 class="text-2xl font-bold text-gray-900">{{ client.name }} — Competitive Intelligence Report</h1>
                     <a href="/reports/{{ report.id }}/print" target="_blank"
                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200 transition no-print">
                         <span class="material-symbols-outlined text-[15px]">print</span> Export PDF
@@ -197,7 +197,7 @@
     {% endif %}
 
     <!-- Summary Stats -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-brand text-[28px] mb-1">key</span>
             <p class="text-2xl font-bold text-gray-900">{{ keywords|length }}</p>
@@ -205,7 +205,7 @@
         </div>
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-emerald-500 text-[28px] mb-1">database</span>
-            <p class="text-2xl font-bold text-gray-900">{{ succeeded|length }}<span class="text-sm text-gray-400 font-normal">/15</span></p>
+            <p class="text-2xl font-bold text-gray-900">{{ succeeded|length }}<span class="text-sm text-gray-400 font-normal">/{{ succeeded|length + failed|length }}</span></p>
             <p class="text-xs text-gray-400">Sources</p>
         </div>
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
@@ -220,12 +220,19 @@
             <p class="text-2xl font-bold text-gray-900">${{ avg_cpc }}</p>
             <p class="text-xs text-gray-400">Avg CPC</p>
         </div>
+        {% set overall_score = insights.get('overall_score', 0) if insights else 0 %}
+        <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
+            <span class="material-symbols-outlined text-blue-500 text-[28px] mb-1">psychology</span>
+            <p class="text-2xl font-bold {% if overall_score >= 70 %}text-emerald-600{% elif overall_score >= 50 %}text-amber-500{% else %}text-gray-700{% endif %}">{{ overall_score }}</p>
+            <p class="text-xs text-gray-400">AI Market Score</p>
+            {% set mp = insights.get('market_position', '') if insights else '' %}
+            {% if mp %}<p class="text-[10px] text-brand mt-0.5">{{ mp }}</p>{% endif %}
+        </div>
     </div>
 
     {# ═══════════════════════════════════════
        SECTION 0: WEBSITE TRAFFIC
     ═══════════════════════════════════════ #}
-    {% if traffic_data %}
     <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
         <div class="flex items-center gap-2 mb-5">
             <span class="material-symbols-outlined text-indigo-500 text-[22px]">bar_chart</span>
@@ -273,11 +280,15 @@
                         </td>
                     </tr>
                     {% endfor %}
+                    {% if not traffic_data %}
+                    <tr><td colspan="6" class="py-6 px-3 text-center text-xs text-gray-400">
+                        Website traffic data requires Ubersuggest credentials. Configure them in Settings → API Credentials.
+                    </td></tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
     </div>
-    {% endif %}
 
     {# ═══════════════════════════════════════
        SECTION 0b: AI SEARCH VISIBILITY
@@ -901,16 +912,19 @@
             {% endif %}
             {% endfor %}
             {% elif ads_data %}
-            {# Ads ran but returned errors / no results #}
-            {% set meta_err = '' %}
-            {% for key, ad in ads_data.items() %}{% if ad.get('error') and not meta_err %}{% set meta_err = ad.get('error') %}{% endif %}{% endfor %}
-            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
-                {% if 'access token' in meta_err|lower or 'token' in meta_err|lower %}
-                    Meta Ads require a Facebook Access Token. Configure it in Settings → Meta credentials.
-                {% else %}
-                    No active Meta ads found for this period{% if meta_err %} ({{ meta_err[:80] }}){% endif %}.
-                {% endif %}
-            </p>
+            {# Ads ran but returned no results — show per-org "no ads" rows #}
+            <div class="space-y-2">
+                {% for key, ad in ads_data.items() %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
+                    <div class="flex items-center gap-2">
+                        {% if ad.get('entity_type') == 'client' %}<span>🏢</span><span class="font-semibold text-gray-700">{{ ad.get('org_name', ad.get('search_term', key)) }}</span>
+                        {% elif ad.get('entity_type') == 'competitor' %}<span>🏬</span><span class="font-medium text-gray-700">{{ ad.get('org_name', ad.get('search_term', key)) }}</span>
+                        {% else %}<span>🔍</span><span class="text-gray-600">{{ ad.get('search_term', key) }}</span>{% endif %}
+                    </div>
+                    <span class="text-gray-400">{% if ad.get('error') and ('token' in ad.get('error','')|lower or 'access' in ad.get('error','')|lower) %}Token required{% else %}No active ads found{% endif %}</span>
+                </div>
+                {% endfor %}
+            </div>
             {% else %}
             <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">Meta Ads credentials not configured. Add a Facebook Access Token in Settings to enable this section.</p>
             {% endif %}

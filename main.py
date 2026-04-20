@@ -737,12 +737,19 @@ def admin():
     recent_reports = (db.session.query(Report)
         .order_by(Report.created_at.desc())
         .limit(10).all())
+    client_report_counts = {}
+    for c in clients:
+        count = (db.session.query(func.count(Report.id))
+            .join(Query, Report.query_id == Query.id)
+            .filter(Query.client_id == c.id).scalar() or 0)
+        client_report_counts[c.id] = count
     return render_template("admin.html",
         clients=clients,
         total_reports=total_reports,
         credentials=credentials,
         glossary_count=glossary_count,
         recent_reports=recent_reports,
+        client_report_counts=client_report_counts,
     )
 
 
