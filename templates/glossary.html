@@ -41,7 +41,7 @@
                                 class="text-gray-300 hover:text-brand transition no-print px-1">
                                 <span class="material-symbols-outlined text-[16px]">arrow_downward</span>
                             </button>
-                            <button onclick="openEdit({{ s.id }}, {{ s | tojson }})"
+                            <button onclick="openEdit({{ s.id }}, {{ {'title': s.title, 'source': s.source, 'description': s.description, 'icon': s.icon, 'color': s.color, 'fields': s.fields} | tojson }})"
                                 class="text-gray-400 hover:text-brand transition no-print px-1">
                                 <span class="material-symbols-outlined text-[16px]">edit</span>
                             </button>
