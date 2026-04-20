@@ -36,7 +36,7 @@ class SentimentCollector(BaseKeywordCollector):
             logger.warning("vaderSentiment not installed, using basic scoring")
             analyzer = None
 
-        for keyword in keywords[:5]:  # Limit API calls
+        for keyword in keywords[:10]:  # Analyze up to 10 keywords
             comments = self._get_youtube_comments(keyword)
 
             if not comments:
@@ -114,12 +114,22 @@ class SentimentCollector(BaseKeywordCollector):
             feed = feedparser.parse(url)
             texts = []
             for entry in feed.entries[:15]:
-                text = entry.get('summary', entry.get('title', ''))
+                raw = entry.get('summary', '') or entry.get('title', '')
+                if raw:
+                    import re as _re, html as _html
+                    clean = _html.unescape(raw)
+                    clean = _re.sub(r'<[^>]+>', ' ', clean)
+                    clean = _re.sub(r'&\w+;', ' ', clean)
+                    clean = _re.sub(r'\s+', ' ', clean).strip()
+                else:
+                    clean = ''
+                # Use title as display text if summary is empty after stripping
+                title_raw = entry.get('title', '')
+                import re as _re, html as _html
+                title_clean = _re.sub(r'<[^>]+>', '', _html.unescape(title_raw)).strip() if title_raw else ''
+                text = clean or title_clean
                 if text:
-                    import re as _re
-                    text = _re.sub(r'<[^>]+>', '', text).strip()
-                if text:
-                    texts.append({'text': text[:300], 'title': entry.get('title', ''),
+                    texts.append({'text': text[:300], 'title': title_clean,
                                   'link': entry.get('link', ''), 'source': entry.get('source', {}).get('title', '')})
             return texts
         except Exception as e:
@@ -154,8 +164,8 @@ class SentimentCollector(BaseKeywordCollector):
             'positive_pct': round(len(pos) / total * 100) if total else 0,
             'neutral_pct': round(len(neu) / total * 100) if total else 0,
             'negative_pct': round(len(neg) / total * 100) if total else 0,
-            'top_positive': [{'text': c['text'][:200], 'score': round(c['score'], 3), 'source': c.get('source', '')} for c in pos[:5]],
-            'top_negative': [{'text': c['text'][:200], 'score': round(c['score'], 3), 'source': c.get('source', '')} for c in neg[:5]],
+            'top_positive': [{'text': c['text'][:200], 'score': round(c['score'], 3), 'source': c.get('source', ''), 'link': c.get('link', ''), 'title': c.get('title', '')} for c in pos[:5]],
+            'top_negative': [{'text': c['text'][:200], 'score': round(c['score'], 3), 'source': c.get('source', ''), 'link': c.get('link', ''), 'title': c.get('title', '')} for c in neg[:5]],
             'total_analyzed': total,
             'source': 'sentiment'
         }
