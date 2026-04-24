@@ -37,6 +37,8 @@ class GoogleNewsCollector(BaseKeywordCollector):
         super().__init__(credentials)
         self.client_name = credentials.get('_client_name', '')
         self.competitors = credentials.get('_competitors', [])
+        self.period_start = credentials.get('_period_start')  # ISO date string e.g. "2025-01-01"
+        self.period_end = credentials.get('_period_end')
 
     def collect(self, keywords: List[str], countries: List[str]) -> Dict[str, Any]:
         # Determine locale from first country in list
@@ -49,16 +51,6 @@ class GoogleNewsCollector(BaseKeywordCollector):
         # Top 5 keywords in news
         for keyword in keywords[:5]:
             results[keyword] = self._fetch_news(keyword)
-
-        # Client brand news
-        if self.client_name:
-            results[f"_brand_{self.client_name}"] = self._fetch_news(self.client_name, label="client_brand")
-
-        # Competitor brand news
-        for idx, comp in enumerate(self.competitors[:3]):
-            name = comp.get('name', '')
-            if name:
-                results[f"_competitor_{idx}_{name}"] = self._fetch_news(name, label="competitor")
 
         # Brand-based news (client + competitors)
         brands = []
@@ -81,6 +73,24 @@ class GoogleNewsCollector(BaseKeywordCollector):
 
         return results
 
+    def _parse_rss_date(self, date_str: str):
+        """Parse RSS date string to datetime, return None on failure."""
+        if not date_str:
+            return None
+        from email.utils import parsedate_to_datetime
+        try:
+            return parsedate_to_datetime(date_str)
+        except Exception:
+            pass
+        # Try ISO format as fallback
+        from datetime import datetime as dt
+        for fmt in ('%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d'):
+            try:
+                return dt.strptime(date_str[:19], fmt)
+            except Exception:
+                pass
+        return None
+
     def _fetch_news(self, query: str, label: str = "keyword") -> Dict[str, Any]:
         try:
             import feedparser
@@ -89,15 +99,50 @@ class GoogleNewsCollector(BaseKeywordCollector):
             feed = feedparser.parse(url)
 
             import html as html_mod
+            from datetime import datetime as dt, timezone
+
+            # Build period filter bounds if set
+            period_start_dt = None
+            period_end_dt = None
+            if self.period_start:
+                try:
+                    period_start_dt = dt.fromisoformat(self.period_start).replace(tzinfo=timezone.utc)
+                except Exception:
+                    pass
+            if self.period_end:
+                try:
+                    period_end_dt = dt.fromisoformat(self.period_end).replace(tzinfo=timezone.utc)
+                except Exception:
+                    pass
+
             articles = []
-            for entry in feed.entries[:10]:
+            for entry in feed.entries[:20]:
+                pub_str = entry.get('published', '')
+                pub_dt = self._parse_rss_date(pub_str)
+
+                # Filter by period if period is set
+                if period_start_dt or period_end_dt:
+                    if pub_dt:
+                        # Make naive datetimes timezone-aware for comparison
+                        if pub_dt.tzinfo is None:
+                            pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                        if period_start_dt and pub_dt < period_start_dt:
+                            continue
+                        if period_end_dt and pub_dt > period_end_dt:
+                            continue
+                    # If we can't parse the date and period filter is active, skip the article
+                    elif period_start_dt or period_end_dt:
+                        continue
+
                 articles.append({
                     'title': html_mod.unescape(entry.get('title', '')),
                     'link': entry.get('link', ''),
-                    'published': entry.get('published', ''),
+                    'published': pub_str,
                     'source': html_mod.unescape(entry.get('source', {}).get('title', 'Unknown')),
                     'summary': html_mod.unescape(entry.get('summary', '')[:300]) if entry.get('summary') else ''
                 })
+                if len(articles) >= 10:
+                    break
 
             return {
                 'query': query,

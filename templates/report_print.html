@@ -96,10 +96,10 @@
             {% if insights.get('top_opportunities') %}
             <div>
                 <div style="font-size:9px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Opportunities</div>
-                {% for opp in insights.top_opportunities[:3] %}
+                {% for opp in insights.top_opportunities %}
                 <div style="margin-bottom:6px;padding:6px 8px;background:white;border-radius:6px;border:1px solid #d1fae5">
-                    <div style="font-weight:700;font-size:10px;color:#1a1a2e">{{ opp.title }}</div>
-                    <div style="color:#64748b;font-size:9px;margin-top:2px">{{ (opp.description or '')[:80] }}</div>
+                    <div style="font-weight:700;font-size:10px;color:#1a1a2e">{{ opp.title }} <span style="font-weight:400;font-size:9px;color:#16a34a">{{ opp.priority }}</span></div>
+                    <div style="color:#64748b;font-size:9px;margin-top:2px">{{ opp.description or '' }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -107,10 +107,10 @@
             {% if insights.get('competitive_threats') %}
             <div>
                 <div style="font-size:9px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Threats</div>
-                {% for t in insights.competitive_threats[:3] %}
+                {% for t in insights.competitive_threats %}
                 <div style="margin-bottom:6px;padding:6px 8px;background:white;border-radius:6px;border:1px solid #fee2e2">
-                    <div style="font-weight:700;font-size:10px;color:#1a1a2e">{{ t.get('competitor', t.get('title','')) }}</div>
-                    <div style="color:#64748b;font-size:9px;margin-top:2px">{{ (t.get('threat', t.get('description','')) or '')[:80] }}</div>
+                    <div style="font-weight:700;font-size:10px;color:#1a1a2e">{{ t.get('competitor', t.get('title','')) }} <span style="font-weight:400;font-size:9px;color:#dc2626">{{ t.get('severity','') }}</span></div>
+                    <div style="color:#64748b;font-size:9px;margin-top:2px">{{ t.get('threat', t.get('description','')) or '' }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -118,7 +118,7 @@
             {% if insights.get('recommended_actions') %}
             <div>
                 <div style="font-size:9px;font-weight:700;color:#6B51F0;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Actions</div>
-                {% for action in insights.recommended_actions[:4] %}
+                {% for action in insights.recommended_actions %}
                 <div style="margin-bottom:5px;font-size:10px;color:#374151;padding-left:10px;position:relative">
                     <span style="position:absolute;left:0;color:#6B51F0;font-weight:700">→</span>{{ action }}
                 </div>
@@ -126,6 +126,26 @@
             </div>
             {% endif %}
         </div>
+        {# Market Score #}
+        {% set overall_score = insights.get('overall_score', 0) %}
+        {% set comp_scores = insights.get('competitor_scores', {}) %}
+        {% if overall_score or comp_scores %}
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid #EDE9FE">
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;margin-bottom:8px">AI Market Score</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <div style="display:flex;align-items:center;gap:6px;background:white;border-radius:8px;padding:6px 10px;border:1px solid #EDE9FE">
+                    <span style="font-size:10px;font-weight:700;color:#374151">🏢 {{ client.name }}</span>
+                    <span style="font-size:16px;font-weight:700;color:{% if overall_score >= 70 %}#16a34a{% elif overall_score >= 50 %}#d97706{% else %}#dc2626{% endif %}">{{ overall_score }}</span>
+                </div>
+                {% for comp_name, score in comp_scores.items() %}
+                <div style="display:flex;align-items:center;gap:6px;background:white;border-radius:8px;padding:6px 10px;border:1px solid #EDE9FE">
+                    <span style="font-size:10px;font-weight:600;color:#64748b">🏬 {{ comp_name }}</span>
+                    <span style="font-size:16px;font-weight:700;color:{% if score >= 70 %}#16a34a{% elif score >= 50 %}#d97706{% else %}#dc2626{% endif %}">{{ score }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -158,7 +178,6 @@
 
     <!-- Website Traffic -->
     {% set traffic_data = kw_data.get('website_traffic', {}) %}
-    {% if traffic_data %}
     <div class="section">
         <div class="section-title">Website Traffic</div>
         <table>
@@ -185,10 +204,12 @@
                 </tr>
                 {% endif %}
                 {% endfor %}
+                {% if not traffic_data %}
+                <tr><td colspan="5" style="color:#94a3b8;font-style:italic;padding:12px">No traffic data available. Check Ubersuggest credentials.</td></tr>
+                {% endif %}
             </tbody>
         </table>
     </div>
-    {% endif %}
 
     <!-- AI Keywords -->
     {% if ai_data_p %}
@@ -223,7 +244,7 @@
                         {% elif t == 'declining' %}<span class="trend-down">↓{% if tp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
                         {% else %}<span class="trend-stable">—</span>{% endif %}
                     </td>
-                    <td style="max-width:220px;color:#64748b">{{ (kd.get('insight', '') or '')[:100] }}</td>
+                    <td style="color:#64748b">{{ kd.get('insight', '') or '' }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -294,7 +315,7 @@
                         {% elif c == 'LOW' %}<span class="badge badge-green">Low</span>
                         {% else %}—{% endif %}
                     </td>
-                    <td style="color:#64748b">{{ (yd.get('top_channels', []) or [])[:2]|join(', ') }}</td>
+                    <td style="color:#64748b">{{ (yd.get('top_channels', []) or [])|join(', ') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -310,8 +331,12 @@
         {% for key, sd in sentiment_data.items() %}
         {% if sd is mapping and sd.get('is_brand') %}
         <div style="margin-bottom:12px;padding:10px;background:#F8F7FF;border-radius:8px;border:1px solid #EDE9FE">
-            <div style="margin-bottom:6px">
+            <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px">
                 <div style="font-weight:700;font-size:11px">{{ sd.get('brand_name', key) }}</div>
+                {% set st = sd.get('sentiment_trend', '') %}{% set stp = sd.get('sentiment_trend_pct') %}
+                {% if st == 'rising' %}<span style="color:#16a34a;font-weight:700;font-size:12px" title="Positive sentiment trending up">↑ Rising{% if stp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
+                {% elif st == 'declining' %}<span style="color:#dc2626;font-weight:700;font-size:12px" title="Positive sentiment trending down">↓ Declining{% if stp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
+                {% elif st == 'stable' %}<span style="color:#d97706;font-size:11px">— Stable</span>{% endif %}
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center;margin-bottom:8px">
                 <div style="background:#f0fdf4;border-radius:6px;padding:6px">
@@ -331,7 +356,7 @@
             <div style="margin-bottom:6px">
                 <div style="font-size:8px;font-weight:700;color:#16a34a;margin-bottom:3px">TOP 5 POSITIVE</div>
                 {% for c in sd.get('top_positive', [])[:5] %}
-                <div style="font-size:9px;color:#374151;padding:3px 6px;background:#f0fdf4;border-radius:4px;margin-bottom:2px">"{{ ((c.get('text','') or c.get('title','')) | striptags)[:100] }}"{% if c.get('url') %} <a href="{{ c.url }}" style="color:#6B51F0">↗</a>{% elif c.get('link','').startswith('http') %} <a href="{{ c.link }}" style="color:#6B51F0">↗</a>{% endif %}</div>
+                <div style="font-size:9px;color:#374151;padding:3px 6px;background:#f0fdf4;border-radius:4px;margin-bottom:2px">"{{ (c.get('text','') or c.get('title','')) | striptags }}"{% if c.get('url') %} <a href="{{ c.url }}" style="color:#6B51F0">↗</a>{% elif c.get('link','').startswith('http') %} <a href="{{ c.link }}" style="color:#6B51F0">↗</a>{% endif %}</div>
                 {% endfor %}
             </div>
             {% endif %}
@@ -339,7 +364,7 @@
             <div>
                 <div style="font-size:8px;font-weight:700;color:#dc2626;margin-bottom:3px">TOP 5 NEGATIVE</div>
                 {% for c in sd.get('top_negative', [])[:5] %}
-                <div style="font-size:9px;color:#374151;padding:3px 6px;background:#fef2f2;border-radius:4px;margin-bottom:2px">"{{ ((c.get('text','') or c.get('title','')) | striptags)[:100] }}"{% if c.get('url') %} <a href="{{ c.url }}" style="color:#6B51F0">↗</a>{% elif c.get('link','').startswith('http') %} <a href="{{ c.link }}" style="color:#6B51F0">↗</a>{% endif %}</div>
+                <div style="font-size:9px;color:#374151;padding:3px 6px;background:#fef2f2;border-radius:4px;margin-bottom:2px">"{{ (c.get('text','') or c.get('title','')) | striptags }}"{% if c.get('url') %} <a href="{{ c.url }}" style="color:#6B51F0">↗</a>{% elif c.get('link','').startswith('http') %} <a href="{{ c.link }}" style="color:#6B51F0">↗</a>{% endif %}</div>
                 {% endfor %}
             </div>
             {% endif %}
@@ -366,7 +391,7 @@
                 {% for a in nd.get('articles', [])[:10] %}
                 <li>
                     <div class="news-dot"></div>
-                    <div><div style="font-weight:600;color:#1a1a2e">{% if a.get('link') %}<a href="{{ a.link }}" style="color:#1a1a2e;text-decoration:none">{{ (a.get('title', '') or '')[:90] }}</a>{% else %}{{ (a.get('title', '') or '')[:90] }}{% endif %}</div>
+                    <div><div style="font-weight:600;color:#1a1a2e">{% if a.get('link') %}<a href="{{ a.link }}" style="color:#1a1a2e;text-decoration:none">{{ a.get('title', '') or '' }}</a>{% else %}{{ a.get('title', '') or '' }}{% endif %}</div>
                     <div class="news-source">{{ a.get('source', '') }}{% if a.get('published') %} · {{ a.get('published', '')[:16] }}{% endif %}</div></div>
                 </li>
                 {% endfor %}
@@ -384,7 +409,7 @@
                 {% for a in nd.get('articles', [])[:3] %}
                 <li>
                     <div class="news-dot" style="background:#94a3b8"></div>
-                    <div><div style="font-weight:600;color:#374151">{{ (a.get('title', '') or '')[:90] }}</div>
+                    <div><div style="font-weight:600;color:#374151">{{ a.get('title', '') or '' }}</div>
                     <div class="news-source">{{ a.get('source', '') }}{% if a.get('published') %} · {{ a.get('published', '')[:16] }}{% endif %}</div></div>
                 </li>
                 {% endfor %}
@@ -456,7 +481,7 @@
                 <tbody>
                 {% for video in yd.get('videos',[])[:5] %}
                 <tr>
-                    <td style="max-width:280px">{{ (video.get('title',''))[:70] }}</td>
+                    <td>{{ video.get('title','') }}</td>
                     <td style="text-align:right;font-family:monospace;width:80px">{{ '{:,}'.format(video.get('views',0)) }} views</td>
                     <td style="text-align:right;color:#16a34a;width:60px">{{ video.get('engagement_rate',0) }}%</td>
                     <td style="color:#94a3b8;font-size:9px;width:70px">{{ video.get('published','')[:10] }}</td>
@@ -563,7 +588,7 @@
                 <div style="font-size:10px;color:#d97706">{% if rd.get('avg_rating') %}★ {{ rd.get('avg_rating') }}{% endif %} {% if rd.get('total_reviews', 0) > 0 %}({{ rd.get('total_reviews') }} reviews){% endif %}</div>
             </div>
             {% for review in rd.get('reviews', [])[:3] %}
-            <div style="font-size:9px;color:#374151;padding:4px 6px;background:white;border-radius:4px;margin-bottom:3px;border:1px solid #FEF08A">{% if review.get('rating') %}{{ '★' * (review.get('rating', 0)|int) }} {% endif %}"{{ review.get('text', '')[:150] }}"</div>
+            <div style="font-size:9px;color:#374151;padding:4px 6px;background:white;border-radius:4px;margin-bottom:3px;border:1px solid #FEF08A">{% if review.get('rating') %}{{ '★' * (review.get('rating', 0)|int) }} {% endif %}"{{ review.get('text', '') }}"</div>
             {% endfor %}
         </div>
         {% endif %}

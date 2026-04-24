@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from sqlalchemy import func
-from database.models import db, Client, Competitor, Query, Report, SubscriptionTier, ShareableLink, APICredential, GlossarySection
+from database.models import db, Client, Competitor, Query, Report, SubscriptionTier, ShareableLink, APICredential, GlossarySection, User
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 from config import Config
 from countries import COUNTRIES
 from datetime import datetime
@@ -14,6 +16,29 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
+
+
+# --- Auth helpers ---
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if session.get('role') != 'admin':
+            return redirect(url_for('login', next=request.path))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.context_processor
+def inject_auth():
+    user_id = session.get('user_id')
+    current_user = None
+    if user_id:
+        try:
+            current_user = User.query.get(user_id)
+        except Exception:
+            pass
+    return {'current_user': current_user}
+
 
 def seed_default_tiers():
     """Create default subscription tiers if they don't exist"""
@@ -74,10 +99,29 @@ def seed_default_glossary():
         db.session.commit()
 
 
+def seed_admin():
+    """Create a default admin user if none exists."""
+    try:
+        if User.query.count() == 0:
+            password = os.environ.get('ADMIN_PASSWORD', 'balthazaar2024')
+            admin = User(
+                username='admin',
+                password_hash=generate_password_hash(password),
+                role='admin'
+            )
+            db.session.add(admin)
+            db.session.commit()
+            logger.info("Default admin user created (username: admin)")
+    except Exception as e:
+        logger.warning(f"seed_admin failed: {e}")
+
+
 with app.app_context():
     db.create_all()
     seed_default_tiers()
-    # Migrations
+    seed_default_glossary()
+    seed_admin()
+    # Migrations: add columns if they don't exist yet
     try:
         from sqlalchemy import text
         with db.engine.connect() as conn:
@@ -106,17 +150,51 @@ with app.app_context():
             conn.commit()
     except Exception:
         pass
-    seed_default_glossary()
+
+
+# --- Auth Routes ---
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get('role') == 'admin':
+        return redirect(url_for('dashboard'))
+    if request.method == "POST":
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password_hash, password):
+            session['user_id'] = user.id
+            session['role'] = user.role
+            session['username'] = user.username
+            next_url = request.form.get('next') or request.args.get('next')
+            if user.role == 'admin':
+                return redirect(next_url or url_for('dashboard'))
+            else:
+                client = user.client
+                if client and client.portal_token:
+                    return redirect(url_for('client_portal', token=client.portal_token))
+                flash("No portal configured for your account. Contact your administrator.", "error")
+        else:
+            flash("Invalid username or password.", "error")
+    next_url = request.args.get('next', '')
+    return render_template("login.html", next=next_url)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("You have been logged out.", "success")
+    return redirect(url_for('login'))
 
 
 # --- Dashboard ---
 @app.route("/")
+@admin_required
 def dashboard():
     clients = Client.query.order_by(Client.created_at.desc()).all()
     total_reports = db.session.query(func.count(Report.id)).scalar() or 0
     total_competitors = db.session.query(func.count(Competitor.id)).scalar() or 0
     total_queries = db.session.query(func.count(Query.id)).scalar() or 0
-    recent_reports = (db.session.query(Report)
+    recent_reports = (Report.query
         .filter_by(status='complete')
         .order_by(Report.generated_at.desc())
         .limit(5).all())
@@ -141,6 +219,7 @@ def _get_links_config():
 
 # --- New Client + Intake Form ---
 @app.route("/clients/new", methods=["GET", "POST"])
+@admin_required
 def new_client():
     if request.method == "GET":
         tiers = SubscriptionTier.query.filter_by(is_active=True).order_by(SubscriptionTier.sort_order).all()
@@ -255,6 +334,7 @@ def new_client():
 
 # --- View Client ---
 @app.route("/clients/<int:client_id>")
+@admin_required
 def view_client(client_id):
     client = db.get_or_404(Client, client_id)
     report_count = sum(len(q.reports) for q in client.queries)
@@ -263,6 +343,7 @@ def view_client(client_id):
 
 # --- Edit Client ---
 @app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
+@admin_required
 def edit_client(client_id):
     client = db.get_or_404(Client, client_id)
 
@@ -297,13 +378,11 @@ def edit_client(client_id):
         comp_name = request.form.get(f"comp_name_{comp.id}", "").strip()
         comp_website = request.form.get(f"comp_website_{comp.id}", "").strip()
         comp_youtube = request.form.get(f"comp_youtube_{comp.id}", "").strip()
-        comp_review = request.form.get(f"comp_review_{comp.id}", "").strip()
         if comp_name:
             comp.name = comp_name
         if comp_website:
             comp.website = comp_website
         comp.youtube_url = comp_youtube
-        comp.review_page_url = comp_review
 
     db.session.commit()
     flash(f"Client '{client.name}' updated.", "success")
@@ -312,6 +391,7 @@ def edit_client(client_id):
 
 # --- Delete Client ---
 @app.route("/clients/<int:client_id>/delete", methods=["POST"])
+@admin_required
 def delete_client(client_id):
     client = db.get_or_404(Client, client_id)
     name = client.name
@@ -323,6 +403,7 @@ def delete_client(client_id):
 
 # --- View Report ---
 @app.route("/reports/<int:report_id>")
+@admin_required
 def view_report(report_id):
     report = db.get_or_404(Report, report_id)
     query = report.query
@@ -350,6 +431,7 @@ def view_report(report_id):
 
 # --- Run Report ---
 @app.route("/queries/<int:query_id>/run", methods=["POST"])
+@admin_required
 def run_report(query_id):
     import threading
     from tasks import run_report_sync
@@ -406,6 +488,7 @@ def report_status(report_id):
 
 # --- Toggle Auto-Run ---
 @app.route("/queries/<int:query_id>/toggle-auto", methods=["POST"])
+@admin_required
 def toggle_auto(query_id):
     query = db.get_or_404(Query, query_id)
     query.auto_run = not query.auto_run
@@ -523,12 +606,14 @@ def public_intake(token):
 
 # --- Manage Shareable Links ---
 @app.route("/links")
+@admin_required
 def manage_links():
     links = ShareableLink.query.order_by(ShareableLink.created_at.desc()).all()
     return render_template("manage_links.html", links=links)
 
 
 @app.route("/links/new", methods=["POST"])
+@admin_required
 def create_link():
     label = request.form.get("label", "Intake Form").strip()
     token = secrets.token_urlsafe(32)
@@ -540,6 +625,7 @@ def create_link():
 
 
 @app.route("/links/<int:link_id>/toggle", methods=["POST"])
+@admin_required
 def toggle_link(link_id):
     link = db.get_or_404(ShareableLink, link_id)
     link.is_active = not link.is_active
@@ -550,6 +636,7 @@ def toggle_link(link_id):
 
 
 @app.route("/links/<int:link_id>/delete", methods=["POST"])
+@admin_required
 def delete_link(link_id):
     link = db.get_or_404(ShareableLink, link_id)
     db.session.delete(link)
@@ -560,6 +647,7 @@ def delete_link(link_id):
 
 # --- Settings: Manage Subscription Tiers ---
 @app.route("/settings")
+@admin_required
 def settings():
     tiers = SubscriptionTier.query.order_by(SubscriptionTier.sort_order).all()
     smtp_cred = APICredential.query.filter_by(service_name='smtp').first()
@@ -580,6 +668,7 @@ def settings():
 
 
 @app.route("/settings/tiers/new", methods=["POST"])
+@admin_required
 def create_tier():
     name = request.form.get("name", "").strip()
     slug = request.form.get("slug", "").strip()
@@ -607,6 +696,7 @@ def create_tier():
 
 
 @app.route("/settings/tiers/<int:tier_id>/edit", methods=["POST"])
+@admin_required
 def edit_tier(tier_id):
     tier = db.get_or_404(SubscriptionTier, tier_id)
     tier.name = request.form.get("name", tier.name).strip()
@@ -622,6 +712,7 @@ def edit_tier(tier_id):
 
 
 @app.route("/settings/tiers/<int:tier_id>/delete", methods=["POST"])
+@admin_required
 def delete_tier(tier_id):
     tier = db.get_or_404(SubscriptionTier, tier_id)
     name = tier.name
@@ -632,6 +723,7 @@ def delete_tier(tier_id):
 
 
 @app.route("/settings/tiers/<int:tier_id>/toggle", methods=["POST"])
+@admin_required
 def toggle_tier(tier_id):
     tier = db.get_or_404(SubscriptionTier, tier_id)
     tier.is_active = not tier.is_active
@@ -643,6 +735,7 @@ def toggle_tier(tier_id):
 
 # --- Email Report ---
 @app.route("/reports/<int:report_id>/email", methods=["POST"])
+@admin_required
 def email_report(report_id):
     from tasks import send_report_email
     report = db.get_or_404(Report, report_id)
@@ -669,6 +762,7 @@ def email_report(report_id):
 
 # --- Edit Executive Summary ---
 @app.route("/reports/<int:report_id>/edit-summary", methods=["POST"])
+@admin_required
 def edit_summary(report_id):
     report = db.get_or_404(Report, report_id)
     try:
@@ -711,6 +805,7 @@ def edit_summary(report_id):
 
 # --- Links Settings (NDA, Contract) ---
 @app.route("/settings/links", methods=["POST"])
+@admin_required
 def save_links():
     """Save NDA and contract URL settings"""
     cred = APICredential.query.filter_by(service_name='links').first()
@@ -729,12 +824,13 @@ def save_links():
 
 # --- Admin Panel ---
 @app.route("/admin")
+@admin_required
 def admin():
     clients = Client.query.order_by(Client.created_at.desc()).all()
     total_reports = db.session.query(func.count(Report.id)).scalar() or 0
     credentials = APICredential.query.all()
     glossary_count = GlossarySection.query.filter_by(is_active=True).count()
-    recent_reports = (db.session.query(Report)
+    recent_reports = (Report.query
         .order_by(Report.created_at.desc())
         .limit(10).all())
     client_report_counts = {}
@@ -743,6 +839,7 @@ def admin():
             .join(Query, Report.query_id == Query.id)
             .filter(Query.client_id == c.id).scalar() or 0)
         client_report_counts[c.id] = count
+    users = User.query.all()
     return render_template("admin.html",
         clients=clients,
         total_reports=total_reports,
@@ -750,17 +847,72 @@ def admin():
         glossary_count=glossary_count,
         recent_reports=recent_reports,
         client_report_counts=client_report_counts,
+        users=users,
     )
+
+
+@app.route("/admin/users/new", methods=["POST"])
+@admin_required
+def admin_create_user():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    role = request.form.get("role", "admin")
+    client_id = request.form.get("client_id") or None
+    if not username or not password:
+        flash("Username and password are required.", "error")
+        return redirect(url_for("admin"))
+    if User.query.filter_by(username=username).first():
+        flash(f"Username '{username}' already exists.", "error")
+        return redirect(url_for("admin"))
+    user = User(
+        username=username,
+        password_hash=generate_password_hash(password),
+        role=role,
+        client_id=int(client_id) if client_id else None,
+    )
+    db.session.add(user)
+    db.session.commit()
+    flash(f"User '{username}' created ({role}).", "success")
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_user(user_id):
+    user = db.get_or_404(User, user_id)
+    if user.id == session.get('user_id'):
+        flash("Cannot delete your own account.", "error")
+        return redirect(url_for("admin"))
+    db.session.delete(user)
+    db.session.commit()
+    flash(f"User '{user.username}' deleted.", "success")
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/users/<int:user_id>/reset-password", methods=["POST"])
+@admin_required
+def admin_reset_password(user_id):
+    user = db.get_or_404(User, user_id)
+    new_password = request.form.get("new_password", "").strip()
+    if not new_password:
+        flash("Password cannot be empty.", "error")
+        return redirect(url_for("admin"))
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    flash(f"Password reset for '{user.username}'.", "success")
+    return redirect(url_for("admin"))
 
 
 # --- Glossary / How It Works ---
 @app.route("/glossary")
+@admin_required
 def glossary():
     sections = GlossarySection.query.filter_by(is_active=True).order_by(GlossarySection.sort_order).all()
     return render_template("glossary.html", sections=sections)
 
 
 @app.route("/glossary/new", methods=["POST"])
+@admin_required
 def glossary_new():
     title = request.form.get("title", "").strip()
     if not title:
@@ -785,6 +937,7 @@ def glossary_new():
 
 
 @app.route("/glossary/<int:section_id>/edit", methods=["POST"])
+@admin_required
 def glossary_edit(section_id):
     section = db.get_or_404(GlossarySection, section_id)
     section.title = request.form.get("title", section.title).strip()
@@ -801,6 +954,7 @@ def glossary_edit(section_id):
 
 
 @app.route("/glossary/<int:section_id>/delete", methods=["POST"])
+@admin_required
 def glossary_delete(section_id):
     section = db.get_or_404(GlossarySection, section_id)
     db.session.delete(section)
@@ -810,6 +964,7 @@ def glossary_delete(section_id):
 
 
 @app.route("/glossary/reorder", methods=["POST"])
+@admin_required
 def glossary_reorder():
     order = request.json.get("order", [])
     for idx, sid in enumerate(order):
@@ -820,6 +975,7 @@ def glossary_reorder():
 
 # --- SMTP Settings ---
 @app.route("/settings/smtp", methods=["POST"])
+@admin_required
 def save_smtp():
     """Save SMTP settings as a special APICredential entry"""
     cred = APICredential.query.filter_by(service_name='smtp').first()
@@ -844,6 +1000,7 @@ def save_smtp():
 
 # --- PDF / Print Export ---
 @app.route("/reports/<int:report_id>/print")
+@admin_required
 def print_report(report_id):
     report = db.get_or_404(Report, report_id)
     query = report.query
@@ -864,6 +1021,7 @@ def print_report(report_id):
 
 # --- Client Portal ---
 @app.route("/clients/<int:client_id>/portal/generate", methods=["POST"])
+@admin_required
 def generate_portal(client_id):
     client = db.get_or_404(Client, client_id)
     if not client.portal_token:
@@ -874,6 +1032,7 @@ def generate_portal(client_id):
 
 
 @app.route("/clients/<int:client_id>/portal/reset", methods=["POST"])
+@admin_required
 def reset_portal(client_id):
     client = db.get_or_404(Client, client_id)
     client.portal_token = secrets.token_urlsafe(32)
@@ -936,7 +1095,7 @@ def run_auto_scheduled_reports():
         queries = Query.query.filter_by(auto_run=True).all()
         triggered = 0
         for query in queries:
-            last_report = (db.session.query(Report)
+            last_report = (Report.query
                            .filter_by(query_id=query.id)
                            .order_by(Report.created_at.desc())
                            .first())
