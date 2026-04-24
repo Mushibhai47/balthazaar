@@ -193,11 +193,32 @@
             </div>
             {% endif %}
         </div>
+
+        {# Market Score row at bottom of executive summary #}
+        {% set overall_score = insights.get('overall_score', 0) %}
+        {% set comp_scores = insights.get('competitor_scores', {}) %}
+        {% if overall_score or comp_scores %}
+        <div class="mt-5 pt-4 border-t border-brand/10">
+            <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-3">AI Market Score</p>
+            <div class="flex flex-wrap gap-3">
+                <div class="flex items-center gap-2 bg-white rounded-xl px-3 py-2 border border-brand/20">
+                    <span class="text-xs font-semibold text-gray-700">🏢 {{ client.name }}</span>
+                    <span class="text-lg font-bold {% if overall_score >= 70 %}text-emerald-600{% elif overall_score >= 50 %}text-amber-500{% else %}text-red-400{% endif %}">{{ overall_score }}</span>
+                </div>
+                {% for comp_name, score in comp_scores.items() %}
+                <div class="flex items-center gap-2 bg-white rounded-xl px-3 py-2 border border-gray-100">
+                    <span class="text-xs font-medium text-gray-500">🏬 {{ comp_name }}</span>
+                    <span class="text-lg font-bold {% if score >= 70 %}text-emerald-600{% elif score >= 50 %}text-amber-500{% else %}text-red-400{% endif %}">{{ score }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
     <!-- Summary Stats -->
-    <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-brand text-[28px] mb-1">key</span>
             <p class="text-2xl font-bold text-gray-900">{{ keywords|length }}</p>
@@ -219,14 +240,6 @@
             <span class="material-symbols-outlined text-purple-500 text-[28px] mb-1">local_atm</span>
             <p class="text-2xl font-bold text-gray-900">${{ avg_cpc }}</p>
             <p class="text-xs text-gray-400">Avg CPC</p>
-        </div>
-        {% set overall_score = insights.get('overall_score', 0) if insights else 0 %}
-        <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
-            <span class="material-symbols-outlined text-blue-500 text-[28px] mb-1">psychology</span>
-            <p class="text-2xl font-bold {% if overall_score >= 70 %}text-emerald-600{% elif overall_score >= 50 %}text-amber-500{% else %}text-gray-700{% endif %}">{{ overall_score }}</p>
-            <p class="text-xs text-gray-400">AI Market Score</p>
-            {% set mp = insights.get('market_position', '') if insights else '' %}
-            {% if mp %}<p class="text-[10px] text-brand mt-0.5">{{ mp }}</p>{% endif %}
         </div>
     </div>
 

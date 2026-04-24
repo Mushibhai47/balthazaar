@@ -184,6 +184,19 @@ class APICredential(db.Model):
             raise ValueError(f"Could not decrypt credentials for {self.service_name}: {e}")
 
 
+class User(db.Model):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), default="admin")  # admin or client
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    client = db.relationship("Client", backref="users", foreign_keys=[client_id])
+
+
 class GlossarySection(db.Model):
     __tablename__ = "glossary_sections"
 

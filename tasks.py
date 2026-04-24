@@ -426,6 +426,8 @@ def _do_generate_report(report_id: int, country_override: str = None):
                 '_client_website': client.website,
                 '_client_youtube': getattr(client, 'youtube_url', '') or '',
                 '_client_review_url': getattr(client, 'review_page_url', '') or '',
+                '_period_start': query.period_start.isoformat() if query.period_start else None,
+                '_period_end': query.period_end.isoformat() if query.period_end else None,
                 '_competitors': [
                     {
                         'name': c.name,

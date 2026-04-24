@@ -160,6 +160,22 @@ class SentimentCollector(BaseKeywordCollector):
         neg = sorted([c for c in scored if c['sentiment'] == 'negative'], key=lambda x: x['score'])
         neu = [c for c in scored if c['sentiment'] == 'neutral']
 
+        # Compute trend: compare first half (most recent) vs second half (older)
+        sentiment_trend = 'stable'
+        sentiment_trend_pct = None
+        if total >= 4:
+            mid = total // 2
+            first_half = scored[:mid]
+            second_half = scored[mid:]
+            first_pos_pct = len([c for c in first_half if c['sentiment'] == 'positive']) / mid * 100
+            second_pos_pct = len([c for c in second_half if c['sentiment'] == 'positive']) / (total - mid) * 100
+            diff = first_pos_pct - second_pos_pct
+            sentiment_trend_pct = round(diff, 1)
+            if diff >= 10:
+                sentiment_trend = 'rising'
+            elif diff <= -10:
+                sentiment_trend = 'declining'
+
         return {
             'positive_pct': round(len(pos) / total * 100) if total else 0,
             'neutral_pct': round(len(neu) / total * 100) if total else 0,
@@ -167,6 +183,8 @@ class SentimentCollector(BaseKeywordCollector):
             'top_positive': [{'text': c['text'][:200], 'score': round(c['score'], 3), 'source': c.get('source', ''), 'link': c.get('link', ''), 'title': c.get('title', '')} for c in pos[:5]],
             'top_negative': [{'text': c['text'][:200], 'score': round(c['score'], 3), 'source': c.get('source', ''), 'link': c.get('link', ''), 'title': c.get('title', '')} for c in neg[:5]],
             'total_analyzed': total,
+            'sentiment_trend': sentiment_trend,
+            'sentiment_trend_pct': sentiment_trend_pct,
             'source': 'sentiment'
         }
 
