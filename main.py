@@ -902,6 +902,19 @@ def admin_create_user():
     return redirect(url_for("admin"))
 
 
+@app.route("/admin/users/<int:user_id>/edit", methods=["POST"])
+@admin_required
+def admin_edit_user(user_id):
+    user = db.get_or_404(User, user_id)
+    role = request.form.get("role", user.role)
+    client_id = request.form.get("client_id") or None
+    user.role = role
+    user.client_id = int(client_id) if client_id else None
+    db.session.commit()
+    flash(f"User '{user.username}' updated.", "success")
+    return redirect(url_for("admin"))
+
+
 @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
 @admin_required
 def admin_delete_user(user_id):
