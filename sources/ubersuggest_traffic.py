@@ -48,8 +48,9 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
     def _login(self) -> bool:
         if self._logged_in:
             return True
-        # If bearer token provided directly, skip login
+        # If bearer token provided directly, use it (may be validated by caller)
         if self.bearer_token:
+            self.session.headers.update({'Authorization': f'Bearer {self.bearer_token}'})
             self._logged_in = True
             return True
         if not self.email or not self.password:
@@ -79,7 +80,7 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
             logger.warning(f"Ubersuggest traffic login failed: {e}")
         return False
 
-    def _fetch_traffic(self, domain: str, label: str, entity_type: str, country_code: str = 'us', loc_id: str = '2840') -> Dict[str, Any]:
+    def _fetch_traffic(self, domain: str, label: str, entity_type: str, country_code: str = 'us', loc_id: str = '2840', _retry: bool = False) -> Dict[str, Any]:
         """Fetch traffic overview for a domain"""
         domain = _clean_domain(domain)
         if not domain:
@@ -91,6 +92,14 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
                 params={'domain': domain, 'lang': 'en', 'locId': loc_id},
                 timeout=15
             )
+            # If token expired, retry once with fresh email/password login
+            if resp.status_code == 401 and not _retry and self.email and self.password:
+                logger.info("Ubersuggest bearer token expired — retrying with email/password login")
+                self._logged_in = False
+                self.bearer_token = ''
+                self.session.headers.pop('Authorization', None)
+                if self._login():
+                    return self._fetch_traffic(domain, label, entity_type, country_code, loc_id, _retry=True)
             if resp.status_code != 200:
                 return {'domain': domain, 'label': label, 'type': entity_type, 'error': f'HTTP {resp.status_code}'}
 

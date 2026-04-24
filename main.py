@@ -157,6 +157,13 @@ with app.app_context():
 def login():
     if session.get('role') == 'admin':
         return redirect(url_for('dashboard'))
+    if session.get('role') == 'client' and session.get('user_id'):
+        try:
+            u = User.query.get(session['user_id'])
+            if u and u.client and u.client.portal_token:
+                return redirect(url_for('client_portal', token=u.client.portal_token))
+        except Exception:
+            pass
     if request.method == "POST":
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
@@ -664,7 +671,20 @@ def settings():
             links_config = links_cred.get_credentials()
         except Exception:
             pass
-    return render_template("settings.html", tiers=tiers, smtp_config=smtp_config, links_config=links_config)
+    credentials = APICredential.query.all()
+    cred_map = {c.service_name: c for c in credentials}
+    cred_values = {}
+    for svc in CREDENTIAL_FIELDS:
+        cred = cred_map.get(svc)
+        if cred:
+            try:
+                cred_values[svc] = cred.get_credentials()
+            except Exception:
+                cred_values[svc] = {}
+        else:
+            cred_values[svc] = {}
+    return render_template("settings.html", tiers=tiers, smtp_config=smtp_config, links_config=links_config,
+                           cred_values=cred_values, credential_fields=CREDENTIAL_FIELDS, cred_map=cred_map)
 
 
 @app.route("/settings/tiers/new", methods=["POST"])
@@ -996,6 +1016,159 @@ def save_smtp():
     import subprocess
     flash("SMTP settings saved. Add these as Replit Secrets for persistence.", "success")
     return redirect(url_for("settings"))
+
+
+# --- API Credentials ---
+CREDENTIAL_FIELDS = {
+    'openai':        [('api_key',        'API Key',             'password', 'sk-...')],
+    'google_gemini': [('api_key',        'API Key',             'password', 'AIza...')],
+    'youtube':       [('api_key',        'API Key',             'password', 'AIza...')],
+    'tiktok':        [('client_key',     'Client Key',          'text',     'awk...'),
+                      ('client_secret',  'Client Secret',       'password', '')],
+    'instagram':     [('access_token',   'Access Token',        'password', ''),
+                      ('app_id',         'App ID',              'text',     ''),
+                      ('app_secret',     'App Secret',          'password', '')],
+    'ubersuggest':   [('email',          'Account Email',       'email',    'you@email.com'),
+                      ('password',       'Account Password',    'password', ''),
+                      ('bearer_token',   'Bearer Token (optional)', 'password', 'Paste from browser DevTools')],
+    'google_ads':    [('developer_token','Developer Token',     'password', ''),
+                      ('client_id',      'OAuth Client ID',     'text',     ''),
+                      ('client_secret',  'OAuth Client Secret', 'password', ''),
+                      ('refresh_token',  'Refresh Token',       'password', ''),
+                      ('customer_id',    'Customer ID',         'text',     '')],
+}
+
+
+@app.route("/settings/credentials/<service_name>", methods=["POST"])
+@admin_required
+def save_credential(service_name):
+    if service_name not in CREDENTIAL_FIELDS:
+        flash("Invalid service name.", "error")
+        return redirect(url_for("settings"))
+    cred = APICredential.query.filter_by(service_name=service_name).first()
+    if not cred:
+        cred = APICredential(service_name=service_name)
+        db.session.add(cred)
+    fields = CREDENTIAL_FIELDS[service_name]
+    cred_data = {}
+    for field_key, _, _, _ in fields:
+        val = request.form.get(field_key, '').strip()
+        if val:
+            cred_data[field_key] = val
+        else:
+            # Keep existing value if blank submitted
+            try:
+                existing = cred.get_credentials() if cred.encrypted_credentials else {}
+                if field_key in existing:
+                    cred_data[field_key] = existing[field_key]
+            except Exception:
+                pass
+    cred.set_credentials(cred_data)
+    cred.is_active = bool(cred_data)
+    db.session.commit()
+    flash(f"Credentials saved for {service_name.replace('_', ' ').title()}.", "success")
+    return redirect(url_for("settings") + "#api-credentials")
+
+
+@app.route("/settings/credentials/<service_name>/delete", methods=["POST"])
+@admin_required
+def delete_credential(service_name):
+    cred = APICredential.query.filter_by(service_name=service_name).first()
+    if cred:
+        db.session.delete(cred)
+        db.session.commit()
+        flash(f"Credentials for {service_name.replace('_', ' ').title()} deleted.", "success")
+    return redirect(url_for("settings") + "#api-credentials")
+
+
+# --- Client Self-Registration ---
+@app.route("/register", methods=["GET", "POST"])
+@app.route("/register/<token>", methods=["GET", "POST"])
+def register(token=None):
+    client = None
+    if token:
+        client = Client.query.filter_by(portal_token=token).first()
+        if not client:
+            flash("Invalid or expired registration link.", "error")
+            return redirect(url_for("login"))
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        confirm = request.form.get("confirm_password", "").strip()
+        client_id_val = request.form.get("client_id") or (str(client.id) if client else None)
+        if not username or not password:
+            flash("Username and password are required.", "error")
+            return render_template("register.html", client=client, token=token)
+        if password != confirm:
+            flash("Passwords do not match.", "error")
+            return render_template("register.html", client=client, token=token)
+        if len(password) < 6:
+            flash("Password must be at least 6 characters.", "error")
+            return render_template("register.html", client=client, token=token)
+        if User.query.filter_by(username=username).first():
+            flash("That username is already taken. Please choose another.", "error")
+            return render_template("register.html", client=client, token=token)
+        user = User(
+            username=username,
+            password_hash=generate_password_hash(password),
+            role="client",
+            client_id=int(client_id_val) if client_id_val else None,
+        )
+        db.session.add(user)
+        db.session.commit()
+        session['user_id'] = user.id
+        session['role'] = user.role
+        session['username'] = user.username
+        if client and client.portal_token:
+            flash(f"Welcome, {username}! Your account is ready.", "success")
+            return redirect(url_for("client_portal", token=client.portal_token))
+        flash("Account created! Please sign in.", "success")
+        return redirect(url_for("login"))
+    return render_template("register.html", client=client, token=token)
+
+
+# --- Portal: Run Report ---
+@app.route("/portal/<token>/run", methods=["POST"])
+def portal_run_report(token):
+    client = Client.query.filter_by(portal_token=token).first()
+    if not client:
+        flash("Invalid portal link.", "error")
+        return redirect(url_for("login"))
+    # Only admin or the linked client user can run reports
+    role = session.get('role')
+    user_id = session.get('user_id')
+    if role != 'admin':
+        if not user_id:
+            flash("Please sign in to run a report.", "error")
+            return redirect(url_for("login", next=f"/portal/{token}"))
+        user = User.query.get(user_id)
+        if not user or user.client_id != client.id:
+            flash("Access denied.", "error")
+            return redirect(url_for("login"))
+    query_id = request.form.get("query_id")
+    query = None
+    if query_id:
+        query = Query.query.get(int(query_id))
+        if not query or query.client_id != client.id:
+            query = None
+    if not query and client.queries:
+        query = client.queries[0]
+    if not query:
+        flash("No report configuration found. Contact your administrator.", "error")
+        return redirect(url_for("client_portal", token=token))
+    country = request.form.get("country") or (query.get_countries()[0] if query.get_countries() else None)
+    report = Report(query_id=query.id, status="pending", country=country)
+    db.session.add(report)
+    db.session.commit()
+    try:
+        from tasks import run_report_sync
+        import threading
+        t = threading.Thread(target=run_report_sync, args=(report.id, country), daemon=True)
+        t.start()
+    except Exception as e:
+        logger.error(f"Portal report start error: {e}")
+    flash("Report generation started! It may take a few minutes — refresh the page to check status.", "success")
+    return redirect(url_for("client_portal", token=token))
 
 
 # --- PDF / Print Export ---
