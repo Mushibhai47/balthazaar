@@ -160,7 +160,10 @@ def login():
     if session.get('role') == 'client' and session.get('user_id'):
         try:
             u = User.query.get(session['user_id'])
-            if u and u.client and u.client.portal_token:
+            if u and u.client:
+                if not u.client.portal_token:
+                    u.client.portal_token = secrets.token_urlsafe(32)
+                    db.session.commit()
                 return redirect(url_for('client_portal', token=u.client.portal_token))
         except Exception:
             pass
@@ -177,9 +180,12 @@ def login():
                 return redirect(next_url or url_for('dashboard'))
             else:
                 client = user.client
-                if client and client.portal_token:
+                if client:
+                    if not client.portal_token:
+                        client.portal_token = secrets.token_urlsafe(32)
+                        db.session.commit()
                     return redirect(url_for('client_portal', token=client.portal_token))
-                flash("No portal configured for your account. Contact your administrator.", "error")
+                flash("Your account is not linked to a client profile yet. Contact your administrator.", "error")
         else:
             flash("Invalid username or password.", "error")
     next_url = request.args.get('next', '')
