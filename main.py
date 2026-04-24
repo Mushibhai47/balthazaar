@@ -194,7 +194,7 @@ def dashboard():
     total_reports = db.session.query(func.count(Report.id)).scalar() or 0
     total_competitors = db.session.query(func.count(Competitor.id)).scalar() or 0
     total_queries = db.session.query(func.count(Query.id)).scalar() or 0
-    recent_reports = (Report.query
+    recent_reports = (db.session.query(Report)
         .filter_by(status='complete')
         .order_by(Report.generated_at.desc())
         .limit(5).all())
@@ -830,7 +830,7 @@ def admin():
     total_reports = db.session.query(func.count(Report.id)).scalar() or 0
     credentials = APICredential.query.all()
     glossary_count = GlossarySection.query.filter_by(is_active=True).count()
-    recent_reports = (Report.query
+    recent_reports = (db.session.query(Report)
         .order_by(Report.created_at.desc())
         .limit(10).all())
     client_report_counts = {}
@@ -1095,7 +1095,7 @@ def run_auto_scheduled_reports():
         queries = Query.query.filter_by(auto_run=True).all()
         triggered = 0
         for query in queries:
-            last_report = (Report.query
+            last_report = (db.session.query(Report)
                            .filter_by(query_id=query.id)
                            .order_by(Report.created_at.desc())
                            .first())
