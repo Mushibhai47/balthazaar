@@ -185,6 +185,80 @@
     </div>
 </div>
 
+<!-- API Credentials -->
+<div id="api-credentials" class="glass-card rounded-2xl shadow-sm border border-gray-100 p-6 mt-8 animate-in">
+    <div class="flex items-center gap-2 mb-5">
+        <span class="material-symbols-outlined text-brand text-[22px]">key</span>
+        <h2 class="text-lg font-semibold text-gray-800">API Credentials</h2>
+    </div>
+    <p class="text-sm text-gray-500 mb-5">Store API keys securely in the database. These override Replit Secrets and are encrypted at rest.</p>
+
+    {% set service_labels = {
+        'openai': ('OpenAI / ChatGPT', 'psychology', 'text-purple-500'),
+        'google_gemini': ('Google Gemini', 'auto_awesome', 'text-blue-500'),
+        'youtube': ('YouTube Data API', 'play_circle', 'text-red-500'),
+        'tiktok': ('TikTok API', 'music_note', 'text-gray-700'),
+        'instagram': ('Instagram / Meta', 'photo_camera', 'text-pink-500'),
+        'ubersuggest': ('Ubersuggest / NeilPatel', 'trending_up', 'text-brand'),
+        'google_ads': ('Google Ads', 'ads_click', 'text-green-600'),
+    } %}
+
+    <div class="space-y-4">
+    {% for svc, fields in credential_fields.items() %}
+    {% set label_info = service_labels.get(svc, (svc, 'key', 'text-gray-500')) %}
+    {% set svc_cred = cred_map.get(svc) %}
+    {% set is_set = svc_cred and svc_cred.is_active %}
+    <details class="border border-gray-100 rounded-xl overflow-hidden" {% if not is_set %}open{% endif %}>
+        <summary class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition select-none">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-[20px] {{ label_info[2] }}">{{ label_info[1] }}</span>
+                <span class="text-sm font-semibold text-gray-800">{{ label_info[0] }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+                {% if is_set %}
+                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Configured
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                    Not set
+                </span>
+                {% endif %}
+                <span class="material-symbols-outlined text-gray-400 text-[18px]">expand_more</span>
+            </div>
+        </summary>
+        <div class="px-4 pb-4 pt-2 border-t border-gray-100 bg-gray-50/50">
+            <form action="/settings/credentials/{{ svc }}" method="POST" class="space-y-3">
+                {% for field_key, field_label, field_type, field_placeholder in fields %}
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">{{ field_label }}</label>
+                    <input type="{{ field_type }}" name="{{ field_key }}"
+                        placeholder="{% if cred_values.get(svc, {}).get(field_key) %}••••••••{% else %}{{ field_placeholder }}{% endif %}"
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none bg-white">
+                    {% if cred_values.get(svc, {}).get(field_key) %}
+                    <p class="text-[10px] text-emerald-600 mt-0.5">✓ Value saved — leave blank to keep existing</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div class="flex gap-2 pt-1">
+                    <button type="submit" class="flex-1 stat-gradient-1 hover:opacity-90 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">
+                        Save {{ label_info[0] }}
+                    </button>
+                </div>
+            </form>
+            {% if is_set %}
+            <form action="/settings/credentials/{{ svc }}/delete" method="POST" onsubmit="return confirm('Delete {{ label_info[0] }} credentials?')" class="mt-2">
+                <button type="submit" class="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-red-500 hover:bg-red-50 rounded-lg text-xs transition border border-red-100">
+                    <span class="material-symbols-outlined text-[14px]">delete</span> Remove saved credentials
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </details>
+    {% endfor %}
+    </div>
+</div>
+
 <!-- SMTP / Email Settings -->
 <div class="glass-card rounded-2xl shadow-sm border border-gray-100 p-6 mt-8 animate-in">
     <div class="flex items-center gap-2 mb-5">

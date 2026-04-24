@@ -48,9 +48,16 @@
                         <span class="material-symbols-outlined text-[16px]">open_in_new</span>
                         Client Portal
                     </a>
-                    <form action="/clients/{{ client.id }}/portal/reset" method="post" class="inline">
-                        <button type="submit" class="text-[10px] text-gray-400 hover:text-red-400 transition">↻ Regenerate link</button>
-                    </form>
+                    <div class="flex items-center gap-2 mt-1">
+                        <a href="/register/{{ client.portal_token }}" target="_blank"
+                           class="text-[10px] text-brand hover:underline font-medium">
+                            ＋ Registration link
+                        </a>
+                        <span class="text-gray-300 text-[10px]">|</span>
+                        <form action="/clients/{{ client.id }}/portal/reset" method="post" class="inline">
+                            <button type="submit" class="text-[10px] text-gray-400 hover:text-red-400 transition">↻ Regenerate link</button>
+                        </form>
+                    </div>
                 </div>
                 {% else %}
                 <form action="/clients/{{ client.id }}/portal/generate" method="post">

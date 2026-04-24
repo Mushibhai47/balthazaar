@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login — Balthazaar</title>
+    <title>Create Account — Balthazaar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -27,7 +27,7 @@
 </head>
 <body class="gradient-bg min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md">
-        <!-- Logo / Brand -->
+        <!-- Brand -->
         <div class="text-center mb-8">
             <div class="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-2xl backdrop-blur mb-4 overflow-hidden">
                 <img src="/static/images/logo.png" alt="Balthazaar" class="w-full h-full object-contain p-2"
@@ -37,13 +37,23 @@
                 </div>
             </div>
             <h1 class="text-2xl font-bold text-white">Balthazaar</h1>
+            {% if client %}
+            <p class="text-white/70 text-sm mt-1">Create your account for <strong class="text-white">{{ client.name }}</strong></p>
+            {% else %}
             <p class="text-white/60 text-sm mt-1">Competitive Intelligence Platform</p>
+            {% endif %}
         </div>
 
-        <!-- Login Card -->
+        <!-- Registration Card -->
         <div class="bg-white rounded-2xl shadow-2xl p-8">
-            <h2 class="text-xl font-bold text-gray-900 mb-1">Sign in</h2>
-            <p class="text-gray-400 text-sm mb-6">Enter your credentials to continue</p>
+            <h2 class="text-xl font-bold text-gray-900 mb-1">Create Account</h2>
+            <p class="text-gray-400 text-sm mb-6">
+                {% if client %}
+                Set up your login to access {{ client.name }}'s reports portal.
+                {% else %}
+                Enter your details to create a client account.
+                {% endif %}
+            </p>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -61,44 +71,66 @@
             {% endif %}
             {% endwith %}
 
-            <form method="post" action="/login" class="space-y-4">
-                {% if next %}
-                <input type="hidden" name="next" value="{{ next }}">
+            <form method="post" class="space-y-4">
+                {% if client %}
+                <input type="hidden" name="client_id" value="{{ client.id }}">
                 {% endif %}
+
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Username</label>
                     <div class="relative">
                         <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">person</span>
                         <input type="text" name="username" required autofocus
                             class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition"
-                            placeholder="Enter username">
+                            placeholder="Choose a username">
                     </div>
                 </div>
+
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Password</label>
                     <div class="relative">
                         <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">lock</span>
-                        <input type="password" name="password" required
+                        <input type="password" name="password" required id="pwd"
                             class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition"
-                            placeholder="Enter password">
+                            placeholder="At least 6 characters">
                     </div>
                 </div>
-                <button type="submit"
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Confirm Password</label>
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">lock_reset</span>
+                        <input type="password" name="confirm_password" required id="cpwd"
+                            class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand outline-none transition"
+                            placeholder="Repeat password">
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn"
                     class="w-full py-3 rounded-xl font-semibold text-white text-sm transition hover:opacity-90"
                     style="background: linear-gradient(135deg, #820263, #D90368);">
-                    Sign In
+                    Create Account
                 </button>
             </form>
 
-            <div class="mt-5 pt-5 border-t border-gray-100 text-center">
-                <p class="text-sm text-gray-400">New client?
-                    <a href="/register" class="text-brand font-medium hover:underline">Create your account →</a>
-                </p>
-                <p class="text-xs text-gray-300 mt-2">Admins and clients both sign in here. Your account determines what you can access.</p>
-            </div>
+            <p class="text-center text-sm text-gray-400 mt-5">
+                Already have an account?
+                <a href="/login" class="text-brand font-medium hover:underline">Sign in</a>
+            </p>
         </div>
 
         <p class="text-center text-white/40 text-xs mt-6">&copy; 2026 Balthazaar. All rights reserved.</p>
     </div>
+
+    <script>
+    document.querySelector('form').addEventListener('submit', function(e) {
+        var pwd = document.getElementById('pwd').value;
+        var cpwd = document.getElementById('cpwd').value;
+        if (pwd !== cpwd) {
+            e.preventDefault();
+            alert('Passwords do not match.');
+        }
+    });
+    </script>
 </body>
 </html>
