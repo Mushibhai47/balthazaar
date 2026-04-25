@@ -179,13 +179,15 @@ def login():
             if user.role == 'admin':
                 return redirect(next_url or url_for('dashboard'))
             else:
-                client = user.client
+                # Refresh to get latest client relationship
+                db.session.refresh(user)
+                client = db.session.get(Client, user.client_id) if user.client_id else None
                 if client:
                     if not client.portal_token:
                         client.portal_token = secrets.token_urlsafe(32)
                         db.session.commit()
                     return redirect(url_for('client_portal', token=client.portal_token))
-                flash("Your account is not linked to a client profile yet. Contact your administrator.", "error")
+                flash("Your account is not linked to a client profile yet. Ask your administrator to link it via Admin → User Accounts → Edit.", "error")
         else:
             flash("Invalid username or password.", "error")
     next_url = request.args.get('next', '')
@@ -1104,12 +1106,14 @@ def delete_credential(service_name):
 @app.route("/register", methods=["GET", "POST"])
 @app.route("/register/<token>", methods=["GET", "POST"])
 def register(token=None):
-    client = None
-    if token:
-        client = Client.query.filter_by(portal_token=token).first()
-        if not client:
-            flash("Invalid or expired registration link.", "error")
-            return redirect(url_for("login"))
+    # Require a valid portal token — clients must use the link from their admin
+    if not token:
+        flash("Please use the registration link provided by your administrator.", "info")
+        return redirect(url_for("login"))
+    client = Client.query.filter_by(portal_token=token).first()
+    if not client:
+        flash("Invalid or expired registration link. Ask your administrator for a new one.", "error")
+        return redirect(url_for("login"))
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
