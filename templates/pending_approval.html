@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Pending — Balthazaar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4" style="background: linear-gradient(135deg, #291720 0%, #820263 50%, #D90368 100%);">
+    <div class="w-full max-w-md text-center">
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-2xl backdrop-blur mb-6">
+            <span class="material-symbols-outlined text-white text-[32px]">hourglass_top</span>
+        </div>
+        <h1 class="text-2xl font-bold text-white mb-2">Account Created!</h1>
+        <p class="text-white/70 text-sm mb-8">Your account <strong class="text-white">{{ username }}</strong> is set up. Your administrator needs to link it to your client profile before you can access your reports.</p>
+
+        <div class="bg-white rounded-2xl shadow-2xl p-6 text-left mb-4">
+            <div class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-amber-500 text-[22px] mt-0.5">info</span>
+                <div>
+                    <p class="text-sm font-semibold text-gray-800 mb-1">What happens next?</p>
+                    <ol class="text-sm text-gray-500 space-y-1 list-decimal list-inside">
+                        <li>Your administrator approves your account</li>
+                        <li>They link you to your client profile</li>
+                        <li>You'll be able to log in and see your reports</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-3">
+            <a href="/logout"
+               class="flex-1 bg-white/20 hover:bg-white/30 text-white font-medium py-3 rounded-xl transition text-sm backdrop-blur">
+                Sign Out
+            </a>
+            <a href="/login"
+               class="flex-1 bg-white text-brand font-semibold py-3 rounded-xl hover:opacity-90 transition text-sm"
+               style="color: #820263;">
+                Try Again
+            </a>
+        </div>
+        <p class="text-white/40 text-xs mt-6">&copy; 2026 Balthazaar. All rights reserved.</p>
+    </div>
+</body>
+</html>
