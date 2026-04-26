@@ -167,7 +167,7 @@ def login():
                         client.portal_token = secrets.token_urlsafe(32)
                         db.session.commit()
                     return redirect(url_for('client_portal', token=client.portal_token))
-                return render_template("pending_approval.html", username=u.username)
+                return redirect(url_for('onboarding'))
         except Exception:
             pass
     if request.method == "POST":
@@ -190,8 +190,8 @@ def login():
                         client.portal_token = secrets.token_urlsafe(32)
                         db.session.commit()
                     return redirect(url_for('client_portal', token=client.portal_token))
-                # Logged in but not yet linked to a client — show pending page
-                return render_template("pending_approval.html", username=user.username)
+                # Logged in but not yet linked to a client — go set up their profile
+                return redirect(url_for('onboarding'))
         else:
             flash("Invalid username or password.", "error")
     next_url = request.args.get('next', '')
@@ -234,6 +234,115 @@ def _get_links_config():
         'nda_url': os.environ.get('NDA_URL', ''),
         'contract_url': os.environ.get('CONTRACT_URL', ''),
     }
+
+
+# --- Client Self-Onboarding (after registration, no admin required) ---
+@app.route("/onboarding", methods=["GET", "POST"])
+def onboarding():
+    """Registered client users set up their own brand profile here."""
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect(url_for('login', next='/onboarding'))
+    user = User.query.get(user_id)
+    if not user:
+        session.clear()
+        return redirect(url_for('login'))
+    # If already linked, go to portal
+    if user.client_id:
+        client = db.session.get(Client, user.client_id)
+        if client:
+            if not client.portal_token:
+                client.portal_token = secrets.token_urlsafe(32)
+                db.session.commit()
+            return redirect(url_for('client_portal', token=client.portal_token))
+
+    if request.method == "GET":
+        tiers = SubscriptionTier.query.filter_by(is_active=True).order_by(SubscriptionTier.sort_order).all()
+        return render_template("intake_form.html", countries=COUNTRIES, tiers=tiers,
+                               links=_get_links_config(), form_action="/onboarding",
+                               onboarding_mode=True)
+
+    # --- POST: create client profile and link to user ---
+    client_name = request.form.get("client_name", "").strip()
+    client_website = request.form.get("client_website", "").strip()
+    contact_name = request.form.get("contact_name", "").strip()
+    contact_email = request.form.get("contact_email", "").strip()
+    subscription_tier = request.form.get("subscription_tier", "trial")
+
+    if not client_name or not client_website or not contact_name or not contact_email:
+        flash("Please fill in all required fields.", "error")
+        return redirect(url_for("onboarding"))
+
+    platforms = request.form.getlist("social_platform[]")
+    handles = request.form.getlist("social_handle[]")
+    social_handles = [{"platform": p, "handle": h.strip()} for p, h in zip(platforms, handles) if h.strip()]
+    client_youtube = request.form.get("client_youtube", "").strip()
+
+    client = Client(
+        name=client_name, website=client_website, youtube_url=client_youtube,
+        contact_name=contact_name, contact_email=contact_email,
+        subscription_tier=subscription_tier,
+        portal_token=secrets.token_urlsafe(32),
+    )
+    client.set_social_handles(social_handles)
+    db.session.add(client)
+    db.session.flush()
+
+    comp_names = request.form.getlist("comp_name[]")
+    comp_websites = request.form.getlist("comp_website[]")
+    comp_youtubes = request.form.getlist("comp_youtube[]")
+    comp_vimeos = request.form.getlist("comp_vimeo[]")
+    comp_reviews = request.form.getlist("comp_review[]")
+    for i in range(len(comp_websites)):
+        if not comp_websites[i].strip():
+            continue
+        comp_platforms = request.form.getlist(f"comp_social_platform_{i}[]")
+        comp_handles_i = request.form.getlist(f"comp_social_handle_{i}[]")
+        comp_socials = [{"platform": p, "handle": h.strip()} for p, h in zip(comp_platforms, comp_handles_i) if h.strip()]
+        comp = Competitor(
+            client_id=client.id,
+            name=comp_names[i].strip() if i < len(comp_names) else "",
+            website=comp_websites[i].strip(),
+            youtube_url=comp_youtubes[i].strip() if i < len(comp_youtubes) else "",
+            vimeo_url=comp_vimeos[i].strip() if i < len(comp_vimeos) else "",
+            review_page_url=comp_reviews[i].strip() if i < len(comp_reviews) else "",
+        )
+        comp.set_social_handles(comp_socials)
+        db.session.add(comp)
+
+    keywords_raw = request.form.get("keywords", "")
+    keywords = [k.strip() for k in keywords_raw.split("\n") if k.strip()][:1000]
+    countries = [c for c in request.form.getlist("countries[]") if c]
+    frequency = request.form.get("frequency", "monthly")
+    auto_run = bool(request.form.get("auto_run"))
+    period_start = request.form.get("period_start")
+    period_end = request.form.get("period_end")
+
+    query = Query(
+        client_id=client.id, frequency=frequency, auto_run=auto_run,
+        period_start=datetime.strptime(period_start, "%Y-%m-%d").date() if period_start else None,
+        period_end=datetime.strptime(period_end, "%Y-%m-%d").date() if period_end else None,
+    )
+    query.set_keywords(keywords)
+    query.set_countries(countries)
+    db.session.add(query)
+
+    recipients_raw = request.form.get("report_recipients", "")
+    extra_emails = [e.strip() for e in recipients_raw.replace(',', '\n').split('\n') if e.strip() and '@' in e]
+    client.set_report_recipients(extra_emails)
+
+    # Link this user to the new client
+    user.client_id = client.id
+    db.session.commit()
+
+    try:
+        from tasks import send_new_client_notification
+        send_new_client_notification(client, keywords, countries)
+    except Exception as e:
+        logger.warning(f"Onboarding notification failed: {e}")
+
+    flash(f"Profile set up! Welcome, {client_name}.", "success")
+    return redirect(url_for('client_portal', token=client.portal_token))
 
 
 # --- New Client + Intake Form ---
@@ -1148,8 +1257,8 @@ def register(token=None):
         if client and client.portal_token:
             flash(f"Welcome, {username}! Your account is ready.", "success")
             return redirect(url_for("client_portal", token=client.portal_token))
-        flash("Account created! Please sign in.", "success")
-        return redirect(url_for("login"))
+        # No client linked yet — go set up their profile
+        return redirect(url_for("onboarding"))
     return render_template("register.html", client=client, token=token)
 
 
