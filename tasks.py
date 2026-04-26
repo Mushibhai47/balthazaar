@@ -335,6 +335,8 @@ def _compute_historical_trends(current_report, query, report_data: dict, country
         else:
             trend = 'stable'
 
+        avg_volume = round(sum(series) / len(series))
+
         # Overwrite trend in every keyword source that has this keyword
         kw_block = report_data.get('keywords', {})
         for src_name, src_data in kw_block.items():
@@ -343,6 +345,7 @@ def _compute_historical_trends(current_report, query, report_data: dict, country
                     src_data[keyword]['trend'] = trend
                     src_data[keyword]['trend_pct'] = round(change_pct, 1)
                     src_data[keyword]['trend_periods'] = len(series)
+                    src_data[keyword]['avg_volume_6m'] = avg_volume
 
     # ── Website traffic trend ──────────────────────────────────────────
     traffic_block = report_data.get('keywords', {}).get('website_traffic', {})
