@@ -49,7 +49,7 @@
         .badge-blue { background: #eff6ff; color: #2563eb; }
         .trend-up { color: #16a34a; font-weight: 700; font-size: 13px; }
         .trend-down { color: #dc2626; font-weight: 700; font-size: 13px; }
-        .trend-stable { color: #94a3b8; font-size: 13px; }
+        .trend-stable { color: #3b82f6; font-size: 13px; }
 
         /* News */
         .news-list { list-style: none; }
@@ -131,7 +131,7 @@
         {% set comp_scores = insights.get('competitor_scores', {}) %}
         {% if overall_score or comp_scores %}
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid #EDE9FE">
-            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;margin-bottom:8px">AI Market Score</div>
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;margin-bottom:8px">ChatGPT Overall Market Score</div>
             <div style="display:flex;flex-wrap:wrap;gap:8px">
                 <div style="display:flex;align-items:center;gap:6px;background:white;border-radius:8px;padding:6px 10px;border:1px solid #EDE9FE">
                     <span style="font-size:10px;font-weight:700;color:#374151">🏢 {{ client.name }}</span>
@@ -220,6 +220,7 @@
                 <tr>
                     <th>Keyword</th>
                     <th style="text-align:right">Volume</th>
+                    <th style="text-align:right">Avg Vol (6M)</th>
                     <th>Competition</th>
                     <th style="text-align:right">CPC</th>
                     <th>Trend</th>
@@ -232,6 +233,7 @@
                 <tr>
                     <td style="font-weight:600">{{ kw }}</td>
                     <td style="text-align:right;font-family:monospace">{% if kd.get('search_volume', 0) > 0 %}{{ '{:,}'.format(kd.get('search_volume')) }}{% else %}—{% endif %}</td>
+                    <td style="text-align:right;font-family:monospace;color:#64748b">{% if kd.get('avg_volume_6m') %}{{ '{:,}'.format(kd.get('avg_volume_6m')) }}{% else %}—{% endif %}</td>
                     <td>{% set c = kd.get('competition', '') %}
                         {% if c == 'HIGH' %}<span class="badge badge-red">High</span>
                         {% elif c == 'MEDIUM' %}<span class="badge badge-amber">Med</span>
@@ -336,7 +338,7 @@
                 {% set st = sd.get('sentiment_trend', '') %}{% set stp = sd.get('sentiment_trend_pct') %}
                 {% if st == 'rising' %}<span style="color:#16a34a;font-weight:700;font-size:12px" title="Positive sentiment trending up">↑ Rising{% if stp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
                 {% elif st == 'declining' %}<span style="color:#dc2626;font-weight:700;font-size:12px" title="Positive sentiment trending down">↓ Declining{% if stp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
-                {% elif st == 'stable' %}<span style="color:#d97706;font-size:11px">— Stable</span>{% endif %}
+                {% elif st == 'stable' %}<span style="color:#3b82f6;font-size:11px">— Stable</span>{% endif %}
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center;margin-bottom:8px">
                 <div style="background:#f0fdf4;border-radius:6px;padding:6px">

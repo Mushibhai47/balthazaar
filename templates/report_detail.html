@@ -69,25 +69,6 @@
             'linkedin_jobs': 'Jobs', 'reviews': 'Reviews', 'ai_insights': 'AI Summary'
         } %}
 
-        {% if succeeded or failed %}
-        <div class="mt-4 pt-4 border-t border-gray-100 no-print">
-            <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-2">Data Sources</p>
-            <div class="flex flex-wrap gap-1.5">
-                {% for s in succeeded %}
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-                    {{ source_labels.get(s, s) }}
-                </span>
-                {% endfor %}
-                {% for s in failed %}
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-600 border border-red-100" title="{{ errors.get(s, '') }}">
-                    <span class="w-1.5 h-1.5 rounded-full bg-red-400 inline-block"></span>
-                    {{ source_labels.get(s, s) }}
-                </span>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
 
     </div>
 
@@ -199,7 +180,7 @@
         {% set comp_scores = insights.get('competitor_scores', {}) %}
         {% if overall_score or comp_scores %}
         <div class="mt-5 pt-4 border-t border-brand/10">
-            <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-3">AI Market Score</p>
+            <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-3">ChatGPT Overall Market Score</p>
             <div class="flex flex-wrap gap-3">
                 <div class="flex items-center gap-2 bg-white rounded-xl px-3 py-2 border border-brand/20">
                     <span class="text-xs font-semibold text-gray-700">🏢 {{ client.name }}</span>
@@ -280,7 +261,7 @@
                             {% set tt = td.get('trend', '') %}{% set tp = td.get('trend_pct') %}
                             {% if tt == 'rising' %}<span class="text-emerald-500" title="Rising{% if tp %} {{ '%+.1f'|format(tp) }}%{% endif %}">↑{% if tp %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
                             {% elif tt == 'declining' %}<span class="text-red-400" title="Declining{% if tp %} {{ '%+.1f'|format(tp) }}%{% endif %}">↓{% if tp %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
-                            {% elif tt == 'stable' %}<span class="text-amber-400">—</span>
+                            {% elif tt == 'stable' %}<span class="text-blue-400">—</span>
                             {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
                         </td>
                         <td class="py-3 px-3 text-right">
@@ -304,90 +285,6 @@
     </div>
 
     {# ═══════════════════════════════════════
-       SECTION 0b: AI SEARCH VISIBILITY
-    ═══════════════════════════════════════ #}
-    {% if ai_visibility and ai_visibility.get('client') %}
-    {% set av_client = ai_visibility.get('client', {}) %}
-    <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
-        <div class="flex items-center gap-2 mb-5">
-            <span class="material-symbols-outlined text-brand text-[22px]">hub</span>
-            <h2 class="text-lg font-semibold text-gray-800">AI Search Visibility</h2>
-        </div>
-
-        {# Visibility scores row: client + competitors #}
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-            <div class="bg-brand/5 rounded-xl p-4 text-center">
-                <div class="text-xs text-gray-500 mb-1 truncate">{{ av_client.get('label', 'Client') }}</div>
-                <div class="text-3xl font-bold text-brand">{{ av_client.get('brand_visibility_pct', 0) }}%</div>
-                <div class="text-xs text-gray-400 mt-1">
-                    {% if av_client.get('industry_rank') %}Rank #{{ av_client.get('industry_rank') }} · {% endif %}
-                    {{ av_client.get('total_analyzed', 0) }} responses
-                </div>
-            </div>
-            {% for key, av in ai_visibility.items() %}
-            {% if key != 'client' and av is mapping %}
-            <div class="bg-gray-50 rounded-xl p-4 text-center">
-                <div class="text-xs text-gray-500 mb-1 truncate">{{ av.get('label', key) }}</div>
-                <div class="text-3xl font-bold text-gray-700">{{ av.get('brand_visibility_pct', 0) }}%</div>
-                <div class="text-xs text-gray-400 mt-1">
-                    {% if av.get('industry_rank') %}Rank #{{ av.get('industry_rank') }} · {% endif %}
-                    {{ av.get('total_analyzed', 0) }} responses
-                </div>
-            </div>
-            {% endif %}
-            {% endfor %}
-        </div>
-
-        {# Top prompts for client #}
-        {% if av_client.get('top_prompts') %}
-        <div class="mb-5">
-            <h3 class="text-sm font-semibold text-gray-700 mb-3">Top AI Prompts Where Brand Appears</h3>
-            <div class="space-y-2">
-                {% for p in av_client.get('top_prompts', [])[:5] %}
-                <div class="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2">
-                    <span class="text-sm text-gray-700 flex-1">{{ p.get('prompt', '') }}</span>
-                    <div class="flex items-center gap-4 ml-4">
-                        {% if p.get('rank') %}<span class="text-xs text-gray-500">Rank {{ p.get('rank') }}</span>{% endif %}
-                        {% if p.get('mentions') %}<span class="text-xs font-medium text-brand">{{ p.get('mentions') }} mentions</span>{% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        {# Competitor comparison table #}
-        {% if av_client.get('competitor_comparison') %}
-        <div>
-            <h3 class="text-sm font-semibold text-gray-700 mb-3">Brand Comparison in AI Responses</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="text-left text-xs text-gray-400 border-b border-gray-100">
-                            <th class="pb-2 font-medium">Brand</th>
-                            <th class="pb-2 font-medium text-right">Visibility</th>
-                            <th class="pb-2 font-medium text-right">Mentions</th>
-                            <th class="pb-2 font-medium text-right">Avg Rank</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50">
-                        {% for b in av_client.get('competitor_comparison', []) %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="py-2 font-medium text-gray-800">{{ b.get('brand', '') }}</td>
-                            <td class="py-2 text-right text-gray-700">{{ b.get('visibility', 0) }}%</td>
-                            <td class="py-2 text-right text-gray-500">{{ b.get('mentions', 0) }}</td>
-                            <td class="py-2 text-right text-gray-500">{{ b.get('avg_rank', '—') }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    {# ═══════════════════════════════════════
        SECTION 1: AI KEYWORD INSIGHTS
     ═══════════════════════════════════════ #}
     {% if ai_data %}
@@ -405,6 +302,7 @@
                     <tr class="border-b border-gray-100">
                         <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Keyword</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Volume</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase" title="Average monthly search volume over last 6 months">Avg Vol (6M)</th>
                         <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Trend</th>
                         <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Competition</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">CPC</th>
@@ -419,6 +317,9 @@
                         <td class="py-3 px-3 text-right text-gray-600 font-mono text-xs">
                             {% if kd.get('search_volume', 0) > 0 %}{{ '{:,}'.format(kd.get('search_volume')) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                         </td>
+                        <td class="py-3 px-3 text-right font-mono text-xs text-gray-500">
+                            {% if kd.get('avg_volume_6m') %}{{ '{:,}'.format(kd.get('avg_volume_6m')) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                        </td>
                         <td class="py-3 px-3 text-center font-bold text-base">
                             {% set trend = kd.get('trend', '') %}
                             {% set trend_pct = kd.get('trend_pct') %}
@@ -427,7 +328,7 @@
                             <span class="text-emerald-500" title="Rising{% if trend_pct %} {{ '%+.1f'|format(trend_pct) }}% over {{ trend_periods }} periods{% endif %}">↑{% if trend_pct %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(trend_pct) }}%</span>{% endif %}</span>
                             {% elif trend == 'declining' %}
                             <span class="text-red-400" title="Declining{% if trend_pct %} {{ '%+.1f'|format(trend_pct) }}% over {{ trend_periods }} periods{% endif %}">↓{% if trend_pct %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(trend_pct) }}%</span>{% endif %}</span>
-                            {% elif trend == 'stable' %}<span class="text-amber-400" title="Stable">—</span>
+                            {% elif trend == 'stable' %}<span class="text-blue-400" title="Stable">—</span>
                             {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
                         </td>
                         <td class="py-3 px-3 text-center">
@@ -683,7 +584,7 @@
                         {% set st = sd.get('sentiment_trend', '') %}{% set stp = sd.get('sentiment_trend_pct') %}
                         {% if st == 'rising' %}<span class="text-emerald-500 font-bold text-sm" title="Positive sentiment trending up{% if stp %} {{ '%+.1f'|format(stp) }}%{% endif %}">↑{% if stp %}<span class="text-[9px] font-normal">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
                         {% elif st == 'declining' %}<span class="text-red-400 font-bold text-sm" title="Positive sentiment trending down{% if stp %} {{ '%+.1f'|format(stp) }}%{% endif %}">↓{% if stp %}<span class="text-[9px] font-normal">{{ '%+.0f'|format(stp) }}%</span>{% endif %}</span>
-                        {% elif st == 'stable' %}<span class="text-amber-400 font-bold">—</span>{% endif %}
+                        {% elif st == 'stable' %}<span class="text-blue-400 font-bold">—</span>{% endif %}
                     </div>
                 </div>
                 <div class="flex gap-2">

@@ -104,13 +104,20 @@ class UbersuggestTrafficCollector(BaseKeywordCollector):
                 return {'domain': domain, 'label': label, 'type': entity_type, 'error': f'HTTP {resp.status_code}'}
 
             data = resp.json()
+            # Log top-level keys to help diagnose field name changes
+            logger.info(f"Ubersuggest domain_overview keys for {domain}: {list(data.keys())[:20]}")
             # Get latest month traffic from domainTraffic time series
-            domain_traffic = data.get('domainTraffic', {})
-            latest_month = max(domain_traffic.keys()) if domain_traffic else None
-            latest = domain_traffic.get(latest_month, {}) if latest_month else {}
-
-            organic = data.get('traffic', latest.get('searchTraffic', 0)) or 0
-            paid = data.get('paidTraffic', latest.get('paidTraffic', 0)) or 0
+            domain_traffic = data.get('domainTraffic', data.get('traffic_history', data.get('trafficHistory', {})))
+            if isinstance(domain_traffic, dict) and domain_traffic:
+                latest_month = max(domain_traffic.keys())
+                latest = domain_traffic.get(latest_month, {})
+            else:
+                latest = {}
+            # Try multiple field name variants
+            organic = (data.get('traffic') or data.get('organicTraffic') or data.get('organic_traffic') or
+                       latest.get('searchTraffic') or latest.get('organicTraffic') or latest.get('traffic') or 0)
+            paid = (data.get('paidTraffic') or data.get('paid_traffic') or
+                    latest.get('paidTraffic') or latest.get('paid') or 0)
             return {
                 'domain': domain,
                 'label': label,
