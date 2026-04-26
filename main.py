@@ -155,21 +155,9 @@ with app.app_context():
 # --- Auth Routes ---
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if session.get('role') == 'admin':
+    # Only redirect away if actively logged in — never block access to the login form
+    if session.get('role') == 'admin' and session.get('user_id'):
         return redirect(url_for('dashboard'))
-    if session.get('role') == 'client' and session.get('user_id'):
-        try:
-            u = User.query.get(session['user_id'])
-            if u:
-                client = db.session.get(Client, u.client_id) if u.client_id else None
-                if client:
-                    if not client.portal_token:
-                        client.portal_token = secrets.token_urlsafe(32)
-                        db.session.commit()
-                    return redirect(url_for('client_portal', token=client.portal_token))
-                return redirect(url_for('onboarding'))
-        except Exception:
-            pass
     if request.method == "POST":
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
