@@ -52,9 +52,25 @@ class WaybackMachineCollector(BaseKeywordCollector):
 
         return results
 
+    @staticmethod
+    def _extract_domain(url: str) -> str:
+        """Strip to bare hostname only — drop paths, query strings, UTM params"""
+        from urllib.parse import urlparse
+        url = url.strip()
+        if not url:
+            return url
+        if '://' not in url:
+            url = 'https://' + url
+        parsed = urlparse(url)
+        host = (parsed.netloc or parsed.path.split('/')[0]).lower()
+        # Strip www.
+        if host.startswith('www.'):
+            host = host[4:]
+        return host
+
     def _check_website(self, url: str, entity_type: str, label: str = '') -> Dict[str, Any]:
         try:
-            clean_url = url.replace('https://', '').replace('http://', '').rstrip('/')
+            clean_url = self._extract_domain(url)
             from_date = (datetime.now() - timedelta(days=30)).strftime('%Y%m%d')
 
             params = {
