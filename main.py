@@ -1140,6 +1140,53 @@ def save_smtp():
     return redirect(url_for("settings"))
 
 
+@app.route("/settings/test-email", methods=["POST"])
+@admin_required
+def test_email():
+    """Send a test email to the logged-in admin to verify email delivery is working."""
+    to_addr = request.form.get("to_email", "").strip()
+    if not to_addr:
+        flash("Please enter a recipient email address.", "error")
+        return redirect(url_for("settings"))
+    try:
+        from tasks import send_report_email as _send
+        # Reuse the same send machinery with a dummy payload
+        from tasks import _get_resend_key, _send_via_resend, _load_smtp_config
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        subject = "Test Email — Balthazaar"
+        html = ("<h2>Test Email</h2>"
+                "<p>If you're reading this, your email delivery is configured correctly.</p>")
+
+        resend_key = _get_resend_key()
+        if resend_key:
+            smtp_cfg = _load_smtp_config()
+            from_addr = smtp_cfg.get('from') or 'noreply@balthazaar.net'
+            _send_via_resend(resend_key, from_addr, [to_addr], subject, html)
+            flash(f"Test email sent via Resend to {to_addr}.", "success")
+        else:
+            cfg = _load_smtp_config()
+            if not cfg.get('host') or not cfg.get('user') or not cfg.get('password'):
+                flash("No email provider configured. Add a Resend API key or SMTP credentials.", "error")
+                return redirect(url_for("settings"))
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = cfg.get('from') or cfg['user']
+            msg['To'] = to_addr
+            msg.attach(MIMEText(html, 'html'))
+            with smtplib.SMTP(cfg['host'], int(cfg.get('port', 587))) as srv:
+                srv.ehlo()
+                srv.starttls()
+                srv.login(cfg['user'], cfg['password'])
+                srv.sendmail(msg['From'], [to_addr], msg.as_string())
+            flash(f"Test email sent via SMTP to {to_addr}.", "success")
+    except Exception as e:
+        flash(f"Test email failed: {e}", "error")
+    return redirect(url_for("settings"))
+
+
 # --- API Credentials ---
 CREDENTIAL_FIELDS = {
     'openai':        [('api_key',        'API Key',             'password', 'sk-...')],
@@ -1158,6 +1205,7 @@ CREDENTIAL_FIELDS = {
                       ('client_secret',  'OAuth Client Secret', 'password', ''),
                       ('refresh_token',  'Refresh Token',       'password', ''),
                       ('customer_id',    'Customer ID',         'text',     '')],
+    'resend':        [('api_key',        'Resend API Key',       'password', 're_...')],
 }
 
 
@@ -1378,7 +1426,8 @@ def portal_report(token, report_id):
         report=report, query=query, client=client,
         data=data, keywords=keywords,
         rising_count=rising_count, avg_cpc=avg_cpc,
-        metadata=metadata, portal_token=token
+        metadata=metadata, competitors=client.competitors,
+        portal_token=token
     )
 
 
