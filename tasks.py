@@ -86,32 +86,87 @@ COLLECTORS_CONFIG = [
 ]
 
 
-def send_report_email(report, client, query, report_data, note='', extra_recipients=None):
-    """Send report completion email to the client contact"""
-    smtp_host = os.environ.get('SMTP_HOST', '')
-    smtp_user = os.environ.get('SMTP_USER', '')
-    smtp_pass = os.environ.get('SMTP_PASSWORD', '')
-    smtp_port = int(os.environ.get('SMTP_PORT', 587))
-    smtp_from = os.environ.get('SMTP_FROM', smtp_user)
-    base_url = os.environ.get('BASE_URL', '')
-
-    if not smtp_host or not smtp_user or not smtp_pass:
+def _load_smtp_config():
+    """Load SMTP config from env vars, falling back to DB credentials."""
+    cfg = {
+        'host': os.environ.get('SMTP_HOST', ''),
+        'user': os.environ.get('SMTP_USER', ''),
+        'password': os.environ.get('SMTP_PASSWORD', ''),
+        'port': int(os.environ.get('SMTP_PORT', 587)),
+        'from': os.environ.get('SMTP_FROM', ''),
+        'base_url': os.environ.get('BASE_URL', ''),
+    }
+    if not cfg['host'] or not cfg['user'] or not cfg['password']:
         try:
-            smtp_cred = APICredential.query.filter_by(service_name='smtp', is_active=True).first()
+            smtp_cred = APICredential.query.filter_by(service_name='smtp').first()
             if smtp_cred:
                 sc = smtp_cred.get_credentials()
-                smtp_host = sc.get('host', smtp_host)
-                smtp_user = sc.get('user', smtp_user)
-                smtp_pass = sc.get('password', smtp_pass)
-                smtp_port = int(sc.get('port', smtp_port))
-                smtp_from = sc.get('from', '') or smtp_user
-                base_url = sc.get('base_url', base_url)
+                cfg['host'] = sc.get('host', cfg['host'])
+                cfg['user'] = sc.get('user', cfg['user'])
+                cfg['password'] = sc.get('password', cfg['password'])
+                cfg['port'] = int(sc.get('port', cfg['port']))
+                cfg['from'] = sc.get('from', cfg['from']) or cfg['user']
+                cfg['base_url'] = sc.get('base_url', cfg['base_url'])
         except Exception:
             pass
+    if not cfg['from']:
+        cfg['from'] = cfg['user']
+    return cfg
 
-    if not smtp_host or not smtp_user or not smtp_pass:
-        logger.info("SMTP not configured — skipping email notification")
-        return
+
+def _get_resend_key():
+    """Return Resend API key from env or DB."""
+    key = os.environ.get('RESEND_API_KEY', '')
+    if not key:
+        try:
+            cred = APICredential.query.filter_by(service_name='resend').first()
+            if cred:
+                key = (cred.get_credentials() or {}).get('api_key', '')
+        except Exception:
+            pass
+    return key
+
+
+def _send_via_resend(api_key, from_addr, to_list, subject, html):
+    """Send email via Resend HTTP API (no extra library needed)."""
+    import urllib.request, urllib.error
+    import json as _json
+    payload = _json.dumps({
+        'from': from_addr,
+        'to': to_list,
+        'subject': subject,
+        'html': html,
+    }).encode()
+    req = urllib.request.Request(
+        'https://api.resend.com/emails',
+        data=payload,
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+        },
+        method='POST'
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = resp.read()
+            logger.info(f"Resend API response: {body[:200]}")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        raise RuntimeError(f"Resend API error {e.code}: {body}")
+
+
+def send_report_email(report, client, query, report_data, note='', extra_recipients=None):
+    """Send report completion email to the client contact.
+    Tries Resend API first, falls back to SMTP. Raises on failure."""
+    resend_key = _get_resend_key()
+    smtp = _load_smtp_config()
+    base_url = resend_key and os.environ.get('BASE_URL', smtp.get('base_url', '')) or smtp.get('base_url', '')
+
+    if not resend_key and (not smtp['host'] or not smtp['user'] or not smtp['password']):
+        raise RuntimeError(
+            "No email provider configured. Add a Resend API key in Settings → Email, "
+            "or configure SMTP credentials."
+        )
     to_email = client.contact_email
     to_name = client.contact_name
     # Additional recipients (can include dozens of emails)
@@ -194,38 +249,43 @@ def send_report_email(report, client, query, report_data, note='', extra_recipie
   </div>
 </div></body></html>"""
 
-    try:
+    subject = f"[{client.name}] Intelligence Report Ready — {date_str}"
+    all_send_to = list(set(all_recipients + [bcc_email]))
+    from_addr = f"Balthazaar Intelligence <{smtp['from']}>" if smtp['from'] else "Balthazaar Intelligence <noreply@balthazaar.net>"
+
+    if resend_key:
+        # Use Resend API — sends to all recipients
+        _send_via_resend(resend_key, from_addr, all_send_to, subject, html)
+        logger.info(f"Report email sent via Resend to {all_send_to}")
+    else:
+        # Fall back to SMTP
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = f"[{client.name}] Intelligence Report Ready — {date_str}"
-        msg['From'] = f"Balthazaar Intelligence <{smtp_from}>"
+        msg['Subject'] = subject
+        msg['From'] = from_addr
         msg['To'] = f"{to_name} <{to_email}>"
         if len(all_recipients) > 1:
             msg['CC'] = ', '.join(r for r in all_recipients if r != to_email)
         msg['Bcc'] = bcc_email
         msg.attach(MIMEText(html, 'html'))
-        send_to = list(set(all_recipients + [bcc_email]))
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
+        with smtplib.SMTP(smtp['host'], smtp['port']) as server:
             server.ehlo()
             server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_from, send_to, msg.as_string())
-        logger.info(f"Report email sent to {to_email}")
-    except Exception as e:
-        logger.error(f"Failed to send report email: {e}")
+            server.login(smtp['user'], smtp['password'])
+            server.sendmail(smtp['from'], all_send_to, msg.as_string())
+        logger.info(f"Report email sent via SMTP to {to_email}")
 
 
 def send_new_client_notification(client, keywords, countries):
     """Send notification to hello@balthazaar.net when a new client form is submitted"""
-    smtp_host = os.environ.get('SMTP_HOST', '')
-    smtp_user = os.environ.get('SMTP_USER', '')
-    smtp_pass = os.environ.get('SMTP_PASSWORD', '')
-    smtp_port = int(os.environ.get('SMTP_PORT', 587))
-    smtp_from = os.environ.get('SMTP_FROM', smtp_user)
+    resend_key = _get_resend_key()
+    smtp = _load_smtp_config()
     notify_to = os.environ.get('BALTHAZAAR_EMAIL', 'hello@balthazaar.net')
 
-    if not smtp_host or not smtp_user or not smtp_pass:
-        logger.info("SMTP not configured — skipping new client notification")
+    if not resend_key and (not smtp['host'] or not smtp['user'] or not smtp['password']):
+        logger.info("Email not configured — skipping new client notification")
         return
+
+    smtp_from = smtp['from'] or notify_to
 
     html = f"""<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f8f7ff;padding:40px">
 <div style="max-width:560px;margin:0 auto;background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(107,81,240,0.1)">
@@ -246,17 +306,22 @@ def send_new_client_notification(client, keywords, countries):
   </div>
 </div></body></html>"""
 
+    subject = f"New Client: {client.name} — Form Submitted"
+    from_addr = f"Balthazaar Intelligence <{smtp_from}>"
     try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = f"New Client: {client.name} — Form Submitted"
-        msg['From'] = f"Balthazaar Intelligence <{smtp_from}>"
-        msg['To'] = notify_to
-        msg.attach(MIMEText(html, 'html'))
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_from, [notify_to], msg.as_string())
+        if resend_key:
+            _send_via_resend(resend_key, from_addr, [notify_to], subject, html)
+        else:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = from_addr
+            msg['To'] = notify_to
+            msg.attach(MIMEText(html, 'html'))
+            with smtplib.SMTP(smtp['host'], smtp['port']) as server:
+                server.ehlo()
+                server.starttls()
+                server.login(smtp['user'], smtp['password'])
+                server.sendmail(smtp_from, [notify_to], msg.as_string())
         logger.info(f"New client notification sent to {notify_to}")
     except Exception as e:
         logger.error(f"Failed to send new client notification: {e}")
