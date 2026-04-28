@@ -1378,7 +1378,8 @@ def portal_report(token, report_id):
         report=report, query=query, client=client,
         data=data, keywords=keywords,
         rising_count=rising_count, avg_cpc=avg_cpc,
-        metadata=metadata, portal_token=token
+        metadata=metadata, competitors=client.competitors,
+        portal_token=token
     )
 
 

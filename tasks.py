@@ -29,19 +29,33 @@ ENV_CREDENTIAL_MAP = {
 
 
 def load_credentials(service_name: str):
-    """Load credentials from DB first, fall back to environment variables"""
+    """Load credentials from DB first, fall back to environment variables.
+    For ubersuggest: always overlay UBERSUGGEST_BEARER_TOKEN from env even when DB creds exist."""
+    db_creds = None
     cred = APICredential.query.filter_by(service_name=service_name, is_active=True).first()
     if cred:
         try:
-            return cred.get_credentials()
+            db_creds = cred.get_credentials()
         except Exception as e:
             logger.warning(f"Failed to decrypt credentials for {service_name}: {e}")
 
-    # Fallback to env vars
     env_map = ENV_CREDENTIAL_MAP.get(service_name, {})
+
+    if db_creds is not None:
+        # Overlay any env vars that aren't set in DB creds (e.g. bearer_token added later)
+        if env_map:
+            for field, env_var in env_map.items():
+                if not db_creds.get(field):
+                    env_val = os.environ.get(env_var, '')
+                    if env_val:
+                        db_creds[field] = env_val
+                        logger.info(f"[{service_name}] Overlaid {field} from env var {env_var}")
+        return db_creds
+
+    # No DB creds — fallback entirely to env vars
     if env_map:
         creds = {field: os.environ.get(env_var, '') for field, env_var in env_map.items()}
-        if any(v for v in creds.values()):  # at least one value present
+        if any(v for v in creds.values()):
             logger.info(f"[{service_name}] Using credentials from environment variables")
             return creds
 
