@@ -150,14 +150,22 @@ class APICredential(db.Model):
 
     def _get_encryption_key(self):
         """Get encryption key from environment or config"""
-        key = os.environ.get("ENCRYPTION_KEY", "placeholder-generate-real-key-before-production")
-        # If it's the placeholder, generate a proper key for development
-        if key == "placeholder-generate-real-key-before-production":
-            key = Fernet.generate_key().decode()
-        # Ensure key is bytes
-        if isinstance(key, str):
-            key = key.encode()
-        return key
+        key = os.environ.get("ENCRYPTION_KEY", "")
+        # Validate that the key is a proper Fernet key (44 url-safe base64 chars)
+        if key and key != "placeholder-generate-real-key-before-production":
+            try:
+                import base64 as _b64
+                raw = _b64.urlsafe_b64decode(key.encode() + b'==')
+                if len(raw) == 32:
+                    return key.encode() if isinstance(key, str) else key
+            except Exception:
+                pass
+        # Fall back to a deterministic key derived from a stable secret so data
+        # encrypted in one restart can be decrypted in the next.
+        fallback_secret = os.environ.get("SECRET_KEY", "balthazaar-default-secret-change-me")
+        import hashlib as _hl
+        raw_key = _hl.sha256(fallback_secret.encode()).digest()
+        return base64.urlsafe_b64encode(raw_key)
 
     def set_credentials(self, creds_dict):
         """Encrypt and store API credentials as JSON"""
