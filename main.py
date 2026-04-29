@@ -1233,10 +1233,14 @@ def save_credential(service_name):
                     cred_data[field_key] = existing[field_key]
             except Exception:
                 pass
-    cred.set_credentials(cred_data)
-    cred.is_active = bool(cred_data)
-    db.session.commit()
-    flash(f"Credentials saved for {service_name.replace('_', ' ').title()}.", "success")
+    try:
+        cred.set_credentials(cred_data)
+        cred.is_active = bool(cred_data)
+        db.session.commit()
+        flash(f"Credentials saved for {service_name.replace('_', ' ').title()}.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Failed to save credentials: {e}. Check your ENCRYPTION_KEY in Replit Secrets.", "error")
     return redirect(url_for("settings") + "#api-credentials")
 
 
@@ -1476,6 +1480,19 @@ def start_scheduler():
         atexit.register(lambda: scheduler.shutdown(wait=False))
     except ImportError:
         pass  # APScheduler not installed, auto-run disabled
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    db.session.rollback()
+    flash(f"An internal error occurred: {e}", "error")
+    return redirect(request.referrer or url_for("dashboard"))
+
+
+@app.errorhandler(404)
+def not_found(e):
+    flash("That page doesn't exist.", "error")
+    return redirect(url_for("dashboard"))
 
 
 if __name__ == "__main__":
