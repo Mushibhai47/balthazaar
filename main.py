@@ -1163,7 +1163,9 @@ def test_email():
         resend_key = _get_resend_key()
         if resend_key:
             smtp_cfg = _load_smtp_config()
-            from_addr = smtp_cfg.get('from') or 'noreply@balthazaar.net'
+            # Use verified domain from SMTP config, or fall back to Resend's
+            # built-in sandbox sender (works without domain verification)
+            from_addr = smtp_cfg.get('from') or 'onboarding@resend.dev'
             _send_via_resend(resend_key, from_addr, [to_addr], subject, html)
             flash(f"Test email sent via Resend to {to_addr}.", "success")
         else:
