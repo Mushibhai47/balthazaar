@@ -368,7 +368,7 @@ function showEditModal(id, name, slug, price, duration, features) {
     document.getElementById('editSlug').value = slug;
     document.getElementById('editPrice').value = price;
     document.getElementById('editDuration').value = duration;
-    document.getElementById('editFeatures').value = features.join('\n');
+    document.getElementById('editFeatures').value = (features || []).join('\n');
     document.getElementById('editModal').classList.remove('hidden');
 }
 

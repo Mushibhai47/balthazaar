@@ -1,0 +1,54 @@
+PROMPT FOR REPLIT AI:
+
+I have a Flask web app called Balthazaar — a competitive intelligence SaaS. The stack is: Python/Flask, SQLAlchemy (SQLite), Jinja2 templates, Tailwind CSS. The main files are main.py (routes), tasks.py (background jobs), database/models.py (SQLAlchemy models), and templates/ (Jinja2 HTML).
+
+Please fix the following issues:
+
+ISSUE 1 — Subscription tier Edit/Hide/Delete buttons show a crash screen
+
+In /settings, there are subscription tier cards. The Edit button calls showEditModal() JS. The form submits to POST /settings/tiers/<id>/edit. This route exists in main.py. However clicking Edit shows a Replit error screen instead of opening the modal. Please:
+
+Verify the showEditModal() JS function in settings.html works correctly and the modal (id="editModal") exists and is rendered
+Verify the POST /settings/tiers/<id>/edit route works and redirects back to /settings
+Verify Hide and Delete buttons also POST correctly
+If the modal HTML is broken or the JS has an error, fix it
+ISSUE 2 — Email sending fails with Resend API error 403 (error code 1010)
+
+In tasks.py, the function _send_via_resend() sends emails via Resend HTTP API. The from address defaults to noreply@balthazaar.net but this domain is not verified. Fix: change the fallback from address to onboarding@resend.dev everywhere in both tasks.py and main.py where Resend is used. Also in send_report_email() and send_new_client_notification() in tasks.py, make sure the from_addr fallback uses onboarding@resend.dev instead of noreply@balthazaar.net.
+
+ISSUE 3 — Website traffic data always shows zero
+
+In sources/ubersuggest_traffic.py, the UbersuggestTrafficCollector tries to log in to Ubersuggest with email/password. But Cloudflare Turnstile blocks server-side logins (returns 403). The fix is to use a bearer_token instead. In tasks.py, the function load_credentials('ubersuggest') should overlay the UBERSUGGEST_BEARER_TOKEN environment variable as the bearer_token field if the DB credential record doesn't have it. Check load_credentials() in tasks.py — there is an ENV_CREDENTIAL_MAP dict. Make sure ubersuggest maps bearer_token to the env var UBERSUGGEST_BEARER_TOKEN, and that load_credentials() overlays env vars for any missing fields when DB credentials exist.
+
+ISSUE 4 — Encryption key crashes when saving API credentials
+
+In database/models.py, the APICredential._get_encryption_key() method reads ENCRYPTION_KEY from env. If it's missing or invalid (not a proper 32-byte base64 Fernet key), Fernet(key) crashes with ValueError. Fix: wrap the Fernet key validation in a try/except. If invalid or missing, derive a stable fallback key using hashlib.sha256(os.environ.get('SECRET_KEY', 'balthazaar-default').encode()).digest() encoded as base64.urlsafe_b64encode(...). This must be deterministic (same key across restarts) so previously saved credentials can still be decrypted.
+
+ISSUE 5 — Admin page client Edit button goes to edit page but subscription tier dropdown may be empty
+
+The GET /clients/<id>/edit route renders edit_client.html and passes tiers from SubscriptionTier.query.filter_by(is_active=True). If no tiers exist in the DB, the subscription section is empty. Make sure the edit_client.html template handles the empty-tiers case gracefully (show a message saying "No tiers configured — add them in Settings").
+
+ISSUE 6 — Error pages show Replit's crash screen instead of a useful page
+
+Add Flask error handlers at the bottom of main.py:
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    db.session.rollback()
+    return render_template("error.html", error=str(e)), 500
+
+@app.errorhandler(404)  
+def not_found(e):
+    return render_template("error.html", error="Page not found"), 404
+Create templates/error.html extending base.html that shows the error message with a "Go to Dashboard" button. This prevents Replit's crash screen from showing.
+
+GENERAL CONTEXT:
+
+ENCRYPTION_KEY, SECRET_KEY, RESEND_API_KEY, UBERSUGGEST_BEARER_TOKEN are Replit Secrets (env vars)
+APICredential model stores encrypted credentials in SQLite
+@admin_required decorator protects all admin routes
+The app uses flash messages for feedback (success/error)
+Do NOT change the database schema or add new models
+Do NOT change the visual design or Tailwind classes
+That covers everything. Paste that to Replit AI and it should be able to work through all of them systematically.

@@ -307,7 +307,7 @@ def send_new_client_notification(client, keywords, countries):
 </div></body></html>"""
 
     subject = f"New Client: {client.name} — Form Submitted"
-    from_addr = f"Balthazaar Intelligence <{smtp_from}>"
+    from_addr = f"Balthazaar Intelligence <{smtp_from}>" if smtp_from else "Balthazaar Intelligence <onboarding@resend.dev>"
     try:
         if resend_key:
             _send_via_resend(resend_key, from_addr, [notify_to], subject, html)
