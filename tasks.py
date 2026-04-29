@@ -251,7 +251,7 @@ def send_report_email(report, client, query, report_data, note='', extra_recipie
 
     subject = f"[{client.name}] Intelligence Report Ready — {date_str}"
     all_send_to = list(set(all_recipients + [bcc_email]))
-    from_addr = f"Balthazaar Intelligence <{smtp['from']}>" if smtp['from'] else "Balthazaar Intelligence <noreply@balthazaar.net>"
+    from_addr = f"Balthazaar Intelligence <{smtp['from']}>" if smtp['from'] else "Balthazaar Intelligence <onboarding@resend.dev>"
 
     if resend_key:
         # Use Resend API — sends to all recipients
