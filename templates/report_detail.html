@@ -231,56 +231,76 @@
     {# ═══════════════════════════════════════
        SECTION 0: WEBSITE TRAFFIC
     ═══════════════════════════════════════ #}
+    {% set manual = report.get_manual_data() %}
+    {% set manual_traffic = manual.get('traffic', []) %}
+    {% set show_traffic = traffic_data or manual_traffic %}
     <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
-        <div class="flex items-center gap-2 mb-5">
-            <span class="material-symbols-outlined text-indigo-500 text-[22px]">bar_chart</span>
-            <h2 class="text-lg font-semibold text-gray-800">Website Traffic</h2>
+        <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-indigo-500 text-[22px]">bar_chart</span>
+                <h2 class="text-lg font-semibold text-gray-800">Website Traffic</h2>
+                {% if manual_traffic and not traffic_data %}<span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100">Manually entered</span>{% endif %}
+            </div>
+            {% if not portal_token %}
+            <button onclick="document.getElementById('trafficModal').classList.remove('hidden')" class="text-xs text-brand border border-brand rounded-lg px-3 py-1.5 hover:bg-brand hover:text-white transition flex items-center gap-1">
+                <span class="material-symbols-outlined text-[14px]">edit</span> Edit Data
+            </button>
+            {% endif %}
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-gray-100">
                         <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Website</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Organic For Period</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Paid For Period</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Total For Period</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Organic</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Paid</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Total</th>
                         <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Trend</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Domain Score</th>
                     </tr>
                 </thead>
                 <tbody>
+                    {% if traffic_data %}
                     {% for key, td in traffic_data.items() %}
                     <tr class="border-b border-gray-50 hover:bg-indigo-50/20 transition">
                         <td class="py-3 px-3 font-medium text-sm">
-                            {% if td.get('type') == 'client' %}
-                            <span class="text-brand font-semibold">🏢 {{ td.get('label', td.get('domain', key)) }}</span>
-                            {% else %}
-                            <span class="text-gray-700">🏬 {{ td.get('label', td.get('domain', key)) }}</span>
-                            {% endif %}
+                            {% if td.get('type') == 'client' %}<span class="text-brand font-semibold">🏢 {{ td.get('label', td.get('domain', key)) }}</span>
+                            {% else %}<span class="text-gray-700">🏬 {{ td.get('label', td.get('domain', key)) }}</span>{% endif %}
                         </td>
                         <td class="py-3 px-3 text-right font-mono text-xs text-emerald-600">{{ '{:,}'.format(td.get('organic_monthly', 0)) }}</td>
                         <td class="py-3 px-3 text-right font-mono text-xs text-blue-600">{{ '{:,}'.format(td.get('paid_monthly', 0)) }}</td>
                         <td class="py-3 px-3 text-right font-mono text-xs text-gray-700 font-semibold">{{ '{:,}'.format(td.get('total_monthly', 0)) }}</td>
                         <td class="py-3 px-3 text-center font-bold text-base">
                             {% set tt = td.get('trend', '') %}{% set tp = td.get('trend_pct') %}
-                            {% if tt == 'rising' %}<span class="text-emerald-500" title="Rising{% if tp %} {{ '%+.1f'|format(tp) }}%{% endif %}">↑{% if tp %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
-                            {% elif tt == 'declining' %}<span class="text-red-400" title="Declining{% if tp %} {{ '%+.1f'|format(tp) }}%{% endif %}">↓{% if tp %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
+                            {% if tt == 'rising' %}<span class="text-emerald-500">↑{% if tp %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
+                            {% elif tt == 'declining' %}<span class="text-red-400">↓{% if tp %}<span class="text-[9px] font-normal ml-0.5">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
                             {% elif tt == 'stable' %}<span class="text-blue-400">—</span>
                             {% else %}<span class="text-gray-300 text-xs">—</span>{% endif %}
                         </td>
                         <td class="py-3 px-3 text-right">
-                            <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold
-                                {% if td.get('domain_score', 0) >= 70 %}bg-emerald-50 text-emerald-700
-                                {% elif td.get('domain_score', 0) >= 40 %}bg-amber-50 text-amber-700
-                                {% else %}bg-gray-100 text-gray-500{% endif %}">
-                                {{ td.get('domain_score', '—') }}
-                            </span>
+                            <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold {% if td.get('domain_score', 0) >= 70 %}bg-emerald-50 text-emerald-700{% elif td.get('domain_score', 0) >= 40 %}bg-amber-50 text-amber-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ td.get('domain_score', '—') }}</span>
                         </td>
                     </tr>
                     {% endfor %}
-                    {% if not traffic_data %}
+                    {% elif manual_traffic %}
+                    {% for td in manual_traffic %}
+                    <tr class="border-b border-gray-50 hover:bg-indigo-50/20 transition">
+                        <td class="py-3 px-3 font-medium text-sm">
+                            {% if td.get('type') == 'client' %}<span class="text-brand font-semibold">🏢 {{ td.get('label', td.get('domain', '')) }}</span>
+                            {% else %}<span class="text-gray-700">🏬 {{ td.get('label', td.get('domain', '')) }}</span>{% endif %}
+                        </td>
+                        <td class="py-3 px-3 text-right font-mono text-xs text-emerald-600">{{ '{:,}'.format(td.get('organic_monthly', 0)) }}</td>
+                        <td class="py-3 px-3 text-right font-mono text-xs text-blue-600">{{ '{:,}'.format(td.get('paid_monthly', 0)) }}</td>
+                        <td class="py-3 px-3 text-right font-mono text-xs text-gray-700 font-semibold">{{ '{:,}'.format(td.get('total_monthly', 0)) }}</td>
+                        <td class="py-3 px-3 text-center text-gray-300 text-xs">—</td>
+                        <td class="py-3 px-3 text-right">
+                            <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold {% if td.get('domain_score', 0) >= 70 %}bg-emerald-50 text-emerald-700{% elif td.get('domain_score', 0) >= 40 %}bg-amber-50 text-amber-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ td.get('domain_score') or '—' }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
                     <tr><td colspan="6" class="py-6 px-3 text-center text-xs text-gray-400">
-                        Website traffic data requires Ubersuggest credentials. Configure them in Settings → API Credentials.
+                        No traffic data yet. {% if not portal_token %}Click "Edit Data" above to enter it manually.{% endif %}
                     </td></tr>
                     {% endif %}
                 </tbody>
@@ -788,10 +808,24 @@
     {# ═══════════════════════════════════════
        SECTION 6: META ADS
     ═══════════════════════════════════════ #}
+    {% set manual_meta = manual.get('meta_ads', {}) %}
+    {% set manual_google = manual.get('google_ads', {}) %}
     <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
-        <div class="flex items-center gap-2 mb-5">
-            <span class="material-symbols-outlined text-blue-600 text-[22px]">campaign</span>
-            <h2 class="text-lg font-semibold text-gray-800">Adverts — Meta & Google</h2>
+        <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-blue-600 text-[22px]">campaign</span>
+                <h2 class="text-lg font-semibold text-gray-800">Adverts — Meta & Google</h2>
+            </div>
+            {% if not portal_token %}
+            <div class="flex gap-2">
+                <button onclick="document.getElementById('metaAdsModal').classList.remove('hidden')" class="text-xs text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-600 hover:text-white transition flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">edit</span> Meta
+                </button>
+                <button onclick="document.getElementById('googleAdsModal').classList.remove('hidden')" class="text-xs text-yellow-600 border border-yellow-200 rounded-lg px-3 py-1.5 hover:bg-yellow-500 hover:text-white transition flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">edit</span> Google
+                </button>
+            </div>
+            {% endif %}
         </div>
 
         {# META ADS #}
@@ -799,12 +833,12 @@
             <div class="flex items-center gap-2 mb-3">
                 <span class="material-symbols-outlined text-[16px] text-blue-600">thumb_up</span>
                 <h3 class="font-semibold text-gray-700 text-sm">Meta Ads (Facebook & Instagram)</h3>
+                {% if manual_meta and not ads_data %}<span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 ml-2">Manually entered</span>{% endif %}
             </div>
             {% set has_meta = namespace(val=false) %}
             {% if ads_data %}{% for key, ad in ads_data.items() %}{% if ad.get('ads') %}{% set has_meta.val = true %}{% endif %}{% endfor %}{% endif %}
             {% if has_meta.val %}
-            {% for key, ad in ads_data.items() %}
-            {% if ad.get('ads') %}
+            {% for key, ad in ads_data.items() %}{% if ad.get('ads') %}
             <div class="mb-3 pb-3 border-b border-gray-50 last:border-0">
                 <p class="text-xs font-semibold text-gray-500 mb-2">
                     {% if ad.get('entity_type') == 'client' %}🏢 {{ ad.get('org_name', ad.get('search_term', key)) }}
@@ -815,36 +849,28 @@
                 <div class="space-y-2">
                     {% for a in ad.get('ads', [])[:5] %}
                     <div class="flex items-center justify-between p-3 bg-blue-50/30 rounded-xl border border-blue-100 text-xs">
-                        <div>
-                            <p class="font-medium text-gray-800">{{ a.get('page_name', '') }}</p>
-                            <p class="text-gray-400">Started: {{ a.get('started', 'Unknown') }}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-gray-500">{{ a.get('impressions', 'N/A') }} impressions</p>
-                            {% if a.get('snapshot_url') %}<a href="{{ a.get('snapshot_url') }}" target="_blank" class="text-brand hover:underline">View Ad →</a>{% endif %}
-                        </div>
+                        <div><p class="font-medium text-gray-800">{{ a.get('page_name', '') }}</p><p class="text-gray-400">Started: {{ a.get('started', 'Unknown') }}</p></div>
+                        <div class="text-right"><p class="text-gray-500">{{ a.get('impressions', 'N/A') }} impressions</p>{% if a.get('snapshot_url') %}<a href="{{ a.get('snapshot_url') }}" target="_blank" class="text-brand hover:underline">View Ad →</a>{% endif %}</div>
                     </div>
                     {% endfor %}
                 </div>
             </div>
-            {% endif %}
-            {% endfor %}
-            {% elif ads_data %}
-            {# Ads ran but returned no results — show per-org "no ads" rows #}
-            <div class="space-y-2">
-                {% for key, ad in ads_data.items() %}
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
-                    <div class="flex items-center gap-2">
-                        {% if ad.get('entity_type') == 'client' %}<span>🏢</span><span class="font-semibold text-gray-700">{{ ad.get('org_name', ad.get('search_term', key)) }}</span>
-                        {% elif ad.get('entity_type') == 'competitor' %}<span>🏬</span><span class="font-medium text-gray-700">{{ ad.get('org_name', ad.get('search_term', key)) }}</span>
-                        {% else %}<span>🔍</span><span class="text-gray-600">{{ ad.get('search_term', key) }}</span>{% endif %}
-                    </div>
-                    <span class="text-gray-400">{% if ad.get('error') and ('token' in ad.get('error','')|lower or 'access' in ad.get('error','')|lower) %}Token required{% else %}No active ads found{% endif %}</span>
-                </div>
-                {% endfor %}
+            {% endif %}{% endfor %}
+            {% elif manual_meta %}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {% if manual_meta.get('period') %}<div class="col-span-2 md:col-span-4 text-xs text-gray-400 mb-1">Period: {{ manual_meta.get('period') }}</div>{% endif %}
+                {% if manual_meta.get('spend') %}<div class="bg-blue-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">Ad Spend</p><p class="font-bold text-gray-800">${{ manual_meta.get('spend') }}</p></div>{% endif %}
+                {% if manual_meta.get('impressions') %}<div class="bg-blue-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">Impressions</p><p class="font-bold text-gray-800">{{ manual_meta.get('impressions') }}</p></div>{% endif %}
+                {% if manual_meta.get('clicks') %}<div class="bg-blue-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">Clicks</p><p class="font-bold text-gray-800">{{ manual_meta.get('clicks') }}</p></div>{% endif %}
+                {% if manual_meta.get('ctr') %}<div class="bg-blue-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">CTR</p><p class="font-bold text-gray-800">{{ manual_meta.get('ctr') }}%</p></div>{% endif %}
+                {% if manual_meta.get('cpc') %}<div class="bg-blue-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">CPC</p><p class="font-bold text-gray-800">${{ manual_meta.get('cpc') }}</p></div>{% endif %}
+                {% if manual_meta.get('leads') %}<div class="bg-blue-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">Leads</p><p class="font-bold text-gray-800">{{ manual_meta.get('leads') }}</p></div>{% endif %}
+                {% if manual_meta.get('cost_per_lead') %}<div class="bg-blue-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">Cost / Lead</p><p class="font-bold text-gray-800">${{ manual_meta.get('cost_per_lead') }}</p></div>{% endif %}
+                {% if manual_meta.get('roas') %}<div class="bg-emerald-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">ROAS</p><p class="font-bold text-emerald-700">{{ manual_meta.get('roas') }}x</p></div>{% endif %}
             </div>
+            {% if manual_meta.get('notes') %}<p class="text-xs text-gray-500 mt-3 p-3 bg-gray-50 rounded-lg">{{ manual_meta.get('notes') }}</p>{% endif %}
             {% else %}
-            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">Meta Ads credentials not configured. Add a Facebook Access Token in Settings to enable this section.</p>
+            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">No Meta Ads data yet.{% if not portal_token %} Click "Meta" above to enter it manually.{% endif %}</p>
             {% endif %}
         </div>
 
@@ -853,29 +879,34 @@
             <div class="flex items-center gap-2 mb-3">
                 <span class="material-symbols-outlined text-[16px] text-yellow-500">ads_click</span>
                 <h3 class="font-semibold text-gray-700 text-sm">Google Search Ads</h3>
+                {% if manual_google %}<span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 ml-2">Manually entered</span>{% endif %}
             </div>
             {% set google_ads_data = kw_data.get('google_ads', {}) %}
             {% set has_google = namespace(val=false) %}
             {% if google_ads_data %}{% for kw, gad in google_ads_data.items() %}{% if gad.get('avg_monthly_searches', 0) > 0 %}{% set has_google.val = true %}{% endif %}{% endfor %}{% endif %}
             {% if has_google.val %}
             <div class="space-y-2">
-                {% for kw, gad in google_ads_data.items() %}
-                {% if gad.get('avg_monthly_searches', 0) > 0 %}
+                {% for kw, gad in google_ads_data.items() %}{% if gad.get('avg_monthly_searches', 0) > 0 %}
                 <div class="flex items-center justify-between p-3 bg-yellow-50/30 rounded-xl border border-yellow-100 text-xs">
-                    <div>
-                        <p class="font-medium text-gray-800">{{ kw }}</p>
-                        <p class="text-gray-400">Competition: {{ gad.get('competition', 'N/A') }}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-gray-600 font-mono">${{ '%.2f'|format(gad.get('suggested_bid', 0)) }} bid</p>
-                        <p class="text-gray-400">{{ '{:,}'.format(gad.get('avg_monthly_searches', 0)) }} searches/period</p>
-                    </div>
+                    <div><p class="font-medium text-gray-800">{{ kw }}</p><p class="text-gray-400">Competition: {{ gad.get('competition', 'N/A') }}</p></div>
+                    <div class="text-right"><p class="text-gray-600 font-mono">${{ '%.2f'|format(gad.get('suggested_bid', 0)) }} bid</p><p class="text-gray-400">{{ '{:,}'.format(gad.get('avg_monthly_searches', 0)) }} searches/period</p></div>
                 </div>
-                {% endif %}
-                {% endfor %}
+                {% endif %}{% endfor %}
             </div>
+            {% elif manual_google %}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {% if manual_google.get('period') %}<div class="col-span-2 md:col-span-4 text-xs text-gray-400 mb-1">Period: {{ manual_google.get('period') }}</div>{% endif %}
+                {% if manual_google.get('spend') %}<div class="bg-yellow-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">Ad Spend</p><p class="font-bold text-gray-800">${{ manual_google.get('spend') }}</p></div>{% endif %}
+                {% if manual_google.get('impressions') %}<div class="bg-yellow-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">Impressions</p><p class="font-bold text-gray-800">{{ manual_google.get('impressions') }}</p></div>{% endif %}
+                {% if manual_google.get('clicks') %}<div class="bg-yellow-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">Clicks</p><p class="font-bold text-gray-800">{{ manual_google.get('clicks') }}</p></div>{% endif %}
+                {% if manual_google.get('ctr') %}<div class="bg-yellow-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">CTR</p><p class="font-bold text-gray-800">{{ manual_google.get('ctr') }}%</p></div>{% endif %}
+                {% if manual_google.get('cpc') %}<div class="bg-yellow-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">CPC</p><p class="font-bold text-gray-800">${{ manual_google.get('cpc') }}</p></div>{% endif %}
+                {% if manual_google.get('conversions') %}<div class="bg-yellow-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">Conversions</p><p class="font-bold text-gray-800">{{ manual_google.get('conversions') }}</p></div>{% endif %}
+                {% if manual_google.get('cost_per_conversion') %}<div class="bg-yellow-50 rounded-xl p-3 text-center"><p class="text-xs text-gray-400 mb-1">Cost / Conv.</p><p class="font-bold text-gray-800">${{ manual_google.get('cost_per_conversion') }}</p></div>{% endif %}
+            </div>
+            {% if manual_google.get('notes') %}<p class="text-xs text-gray-500 mt-3 p-3 bg-gray-50 rounded-lg">{{ manual_google.get('notes') }}</p>{% endif %}
             {% else %}
-            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">Google Ads keyword data not available. This requires a Google Ads developer token — contact us to set up access.</p>
+            <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">No Google Ads data yet.{% if not portal_token %} Click "Google" above to enter it manually.{% endif %}</p>
             {% endif %}
         </div>
     </div>
@@ -1072,4 +1103,106 @@
 
 </div>
 <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+
+{# ── TRAFFIC MANUAL DATA MODAL ── #}
+<div id="trafficModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8">
+    <div class="flex items-center justify-between p-6 border-b border-gray-100">
+      <h3 class="font-semibold text-gray-800">Edit Website Traffic Data</h3>
+      <button onclick="document.getElementById('trafficModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <form method="post" action="/reports/{{ report.id }}/manual-data" class="p-6">
+      <input type="hidden" name="section" value="traffic">
+      <p class="text-xs text-gray-400 mb-4">Enter traffic data manually from Ubersuggest or SimilarWeb. Leave blank to skip a row.</p>
+      <div id="trafficRows" class="space-y-3">
+        {% set mt = report.get_manual_data().get('traffic', []) %}
+        {% set default_rows = [{'domain': client.website, 'label': client.name, 'type': 'client', 'organic_monthly': 0, 'paid_monthly': 0, 'domain_score': 0}] %}
+        {% for comp in client.competitors %}{% set default_rows = default_rows + [{'domain': comp.website, 'label': comp.name, 'type': 'competitor', 'organic_monthly': 0, 'paid_monthly': 0, 'domain_score': 0}] %}{% endfor %}
+        {% set rows = mt if mt else default_rows %}
+        {% for row in rows %}
+        <div class="grid grid-cols-12 gap-2 items-center text-xs">
+          <div class="col-span-3"><input type="text" name="website[]" value="{{ row.get('domain','') }}" placeholder="domain.com" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          <div class="col-span-3"><input type="text" name="label[]" value="{{ row.get('label','') }}" placeholder="Label" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          <select name="row_type[]" class="col-span-2 border border-gray-200 rounded-lg px-1 py-1.5 text-xs">
+            <option value="client" {% if row.get('type')=='client' %}selected{% endif %}>Client</option>
+            <option value="competitor" {% if row.get('type')=='competitor' %}selected{% endif %}>Competitor</option>
+          </select>
+          <div class="col-span-1"><input type="number" name="organic[]" value="{{ row.get('organic_monthly',0) }}" placeholder="Organic" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          <div class="col-span-1"><input type="number" name="paid[]" value="{{ row.get('paid_monthly',0) }}" placeholder="Paid" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          <div class="col-span-2"><input type="number" name="domain_score[]" value="{{ row.get('domain_score',0) }}" placeholder="Score" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+        </div>
+        {% endfor %}
+        <div class="grid grid-cols-12 gap-2 items-center text-xs text-gray-400 font-semibold px-1">
+          <div class="col-span-3">Website</div><div class="col-span-3">Label</div><div class="col-span-2">Type</div><div class="col-span-1">Organic</div><div class="col-span-1">Paid</div><div class="col-span-2">DA Score</div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+        <button type="button" onclick="document.getElementById('trafficModal').classList.add('hidden')" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">Cancel</button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-brand text-white text-sm font-medium hover:bg-brand-dark transition">Save Traffic Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── META ADS MANUAL DATA MODAL ── #}
+<div id="metaAdsModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
+    <div class="flex items-center justify-between p-6 border-b border-gray-100">
+      <h3 class="font-semibold text-gray-800">Edit Meta Ads Data</h3>
+      <button onclick="document.getElementById('metaAdsModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    {% set mm = report.get_manual_data().get('meta_ads', {}) %}
+    <form method="post" action="/reports/{{ report.id }}/manual-data" class="p-6 space-y-4">
+      <input type="hidden" name="section" value="meta_ads">
+      <div><label class="text-xs font-medium text-gray-600 block mb-1">Period (e.g. April 2026)</label>
+        <input type="text" name="period" value="{{ mm.get('period','') }}" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">Ad Spend ($)</label><input type="text" name="spend" value="{{ mm.get('spend','') }}" placeholder="e.g. 2500" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">Impressions</label><input type="text" name="impressions" value="{{ mm.get('impressions','') }}" placeholder="e.g. 150,000" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">Clicks</label><input type="text" name="clicks" value="{{ mm.get('clicks','') }}" placeholder="e.g. 3200" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">CTR (%)</label><input type="text" name="ctr" value="{{ mm.get('ctr','') }}" placeholder="e.g. 2.1" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">CPC ($)</label><input type="text" name="cpc" value="{{ mm.get('cpc','') }}" placeholder="e.g. 0.78" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">Leads</label><input type="text" name="leads" value="{{ mm.get('leads','') }}" placeholder="e.g. 85" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">Cost per Lead ($)</label><input type="text" name="cost_per_lead" value="{{ mm.get('cost_per_lead','') }}" placeholder="e.g. 29.40" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">ROAS</label><input type="text" name="roas" value="{{ mm.get('roas','') }}" placeholder="e.g. 3.2" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+      </div>
+      <div><label class="text-xs font-medium text-gray-600 block mb-1">Notes</label><textarea name="notes" rows="2" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none">{{ mm.get('notes','') }}</textarea></div>
+      <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+        <button type="button" onclick="document.getElementById('metaAdsModal').classList.add('hidden')" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">Cancel</button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition">Save Meta Ads Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── GOOGLE ADS MANUAL DATA MODAL ── #}
+<div id="googleAdsModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
+    <div class="flex items-center justify-between p-6 border-b border-gray-100">
+      <h3 class="font-semibold text-gray-800">Edit Google Ads Data</h3>
+      <button onclick="document.getElementById('googleAdsModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    {% set mg = report.get_manual_data().get('google_ads', {}) %}
+    <form method="post" action="/reports/{{ report.id }}/manual-data" class="p-6 space-y-4">
+      <input type="hidden" name="section" value="google_ads">
+      <div><label class="text-xs font-medium text-gray-600 block mb-1">Period (e.g. April 2026)</label>
+        <input type="text" name="period" value="{{ mg.get('period','') }}" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">Ad Spend ($)</label><input type="text" name="spend" value="{{ mg.get('spend','') }}" placeholder="e.g. 1800" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">Impressions</label><input type="text" name="impressions" value="{{ mg.get('impressions','') }}" placeholder="e.g. 90,000" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">Clicks</label><input type="text" name="clicks" value="{{ mg.get('clicks','') }}" placeholder="e.g. 2100" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">CTR (%)</label><input type="text" name="ctr" value="{{ mg.get('ctr','') }}" placeholder="e.g. 2.3" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">CPC ($)</label><input type="text" name="cpc" value="{{ mg.get('cpc','') }}" placeholder="e.g. 0.86" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">Conversions</label><input type="text" name="conversions" value="{{ mg.get('conversions','') }}" placeholder="e.g. 42" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+        <div><label class="text-xs font-medium text-gray-600 block mb-1">Cost per Conversion ($)</label><input type="text" name="cost_per_conversion" value="{{ mg.get('cost_per_conversion','') }}" placeholder="e.g. 42.86" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
+      </div>
+      <div><label class="text-xs font-medium text-gray-600 block mb-1">Notes</label><textarea name="notes" rows="2" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none">{{ mg.get('notes','') }}</textarea></div>
+      <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+        <button type="button" onclick="document.getElementById('googleAdsModal').classList.add('hidden')" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">Cancel</button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-yellow-500 text-white text-sm font-medium hover:bg-yellow-600 transition">Save Google Ads Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}

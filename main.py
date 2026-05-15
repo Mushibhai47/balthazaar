@@ -150,6 +150,20 @@ with app.app_context():
             conn.commit()
     except Exception:
         pass
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE reports ADD COLUMN manual_data TEXT DEFAULT '{}'"))
+            conn.commit()
+    except Exception:
+        pass
+    try:
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text("ALTER TABLE reports ADD COLUMN executive_summary TEXT DEFAULT ''"))
+            conn.commit()
+    except Exception:
+        pass
 
 
 # --- Auth Routes ---
@@ -929,6 +943,83 @@ def edit_summary(report_id):
     report.data = json.dumps(data)
     db.session.commit()
     flash("Executive summary updated.", "success")
+    return redirect(url_for("view_report", report_id=report_id))
+
+
+# --- Manual Data Entry (Traffic, Meta Ads, Google Ads) ---
+@app.route("/reports/<int:report_id>/manual-data", methods=["POST"])
+@admin_required
+def save_manual_data(report_id):
+    report = db.get_or_404(Report, report_id)
+    section = request.form.get("section", "")
+    try:
+        manual = json.loads(report.manual_data or "{}")
+    except Exception:
+        manual = {}
+
+    if section == "traffic":
+        rows = []
+        websites = request.form.getlist("website[]")
+        labels = request.form.getlist("label[]")
+        organics = request.form.getlist("organic[]")
+        paids = request.form.getlist("paid[]")
+        scores = request.form.getlist("domain_score[]")
+        types = request.form.getlist("row_type[]")
+        for i, w in enumerate(websites):
+            if w.strip():
+                try:
+                    org = int(str(organics[i]).replace(",", "")) if i < len(organics) and organics[i] else 0
+                except Exception:
+                    org = 0
+                try:
+                    paid = int(str(paids[i]).replace(",", "")) if i < len(paids) and paids[i] else 0
+                except Exception:
+                    paid = 0
+                try:
+                    score = int(scores[i]) if i < len(scores) and scores[i] else 0
+                except Exception:
+                    score = 0
+                rows.append({
+                    "domain": w.strip(),
+                    "label": labels[i].strip() if i < len(labels) and labels[i] else w.strip(),
+                    "type": types[i] if i < len(types) else "competitor",
+                    "organic_monthly": org,
+                    "paid_monthly": paid,
+                    "total_monthly": org + paid,
+                    "domain_score": score,
+                })
+        manual["traffic"] = rows
+
+    elif section == "meta_ads":
+        manual["meta_ads"] = {
+            "period": request.form.get("period", ""),
+            "spend": request.form.get("spend", ""),
+            "impressions": request.form.get("impressions", ""),
+            "clicks": request.form.get("clicks", ""),
+            "ctr": request.form.get("ctr", ""),
+            "cpc": request.form.get("cpc", ""),
+            "leads": request.form.get("leads", ""),
+            "cost_per_lead": request.form.get("cost_per_lead", ""),
+            "roas": request.form.get("roas", ""),
+            "notes": request.form.get("notes", ""),
+        }
+
+    elif section == "google_ads":
+        manual["google_ads"] = {
+            "period": request.form.get("period", ""),
+            "spend": request.form.get("spend", ""),
+            "impressions": request.form.get("impressions", ""),
+            "clicks": request.form.get("clicks", ""),
+            "ctr": request.form.get("ctr", ""),
+            "cpc": request.form.get("cpc", ""),
+            "conversions": request.form.get("conversions", ""),
+            "cost_per_conversion": request.form.get("cost_per_conversion", ""),
+            "notes": request.form.get("notes", ""),
+        }
+
+    report.manual_data = json.dumps(manual)
+    db.session.commit()
+    flash(f"Manual data saved.", "success")
     return redirect(url_for("view_report", report_id=report_id))
 
 

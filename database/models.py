@@ -101,9 +101,17 @@ class Report(db.Model):
     query_id = db.Column(db.Integer, db.ForeignKey("queries.id"), nullable=False)
     status = db.Column(db.String(50), default="pending")  # pending, running, complete, failed
     data = db.Column(db.Text, default="{}")  # JSON blob with all scraped results
+    manual_data = db.Column(db.Text, default="{}")  # JSON blob for manually entered data
+    executive_summary = db.Column(db.Text, default="")
     country = db.Column(db.String(100), nullable=True)  # specific country for this report (None = all countries)
     generated_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def get_manual_data(self):
+        try:
+            return json.loads(self.manual_data or "{}")
+        except Exception:
+            return {}
 
 
 class SubscriptionTier(db.Model):
