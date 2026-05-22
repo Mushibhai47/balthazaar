@@ -211,7 +211,7 @@
         </div>
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
             <span class="material-symbols-outlined text-emerald-500 text-[28px] mb-1">database</span>
-            <p class="text-2xl font-bold text-gray-900">{{ succeeded|length }}<span class="text-sm text-gray-400 font-normal">/{{ succeeded|length + failed|length }}</span></p>
+            <p class="text-2xl font-bold text-gray-900">{{ succeeded|length }}</p>
             <p class="text-xs text-gray-400">Sources</p>
         </div>
         <div class="glass-card rounded-2xl border border-gray-100 p-5 text-center card-hover">
@@ -326,7 +326,7 @@
                     <tr class="border-b border-gray-100">
                         <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Keyword</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Volume</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase" title="Average monthly search volume over last 6 months">Avg Vol (6M)</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase" title="Average search volume over the last 6 identical periods as this report">Avg Vol (6P)*</th>
                         <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Trend</th>
                         <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Competition</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">CPC</th>
@@ -342,7 +342,8 @@
                             {% if kd.get('search_volume', 0) > 0 %}{{ '{:,}'.format(kd.get('search_volume')) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                         </td>
                         <td class="py-3 px-3 text-right font-mono text-xs text-gray-500">
-                            {% if kd.get('avg_volume_6m') %}{{ '{:,}'.format(kd.get('avg_volume_6m')) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                            {% set avg6 = kd.get('avg_volume_6m') or kd.get('avg_volume_6p') %}
+                            {% if avg6 %}{{ '{:,}'.format(avg6) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                         </td>
                         <td class="py-3 px-3 text-center font-bold text-base">
                             {% set trend = kd.get('trend', '') %}
@@ -371,13 +372,14 @@
                 </tbody>
             </table>
         </div>
-        {% set ai_prompts = ai_data.get('_ai_prompts', []) %}
+        <p class="text-[10px] text-gray-400 mt-2 px-1">* 6P = average search volume over the last 6 identical reporting periods (e.g. last 6 fortnights for a fortnightly report).</p>
+        {% set ai_prompts = ai_data.get('_ai_prompts', []) | sort(attribute='search_volume', reverse=True) %}
         {% if ai_prompts %}
         <div class="mt-6 pt-5 border-t border-gray-100">
             <div class="flex items-center gap-2 mb-4">
                 <span class="material-symbols-outlined text-purple-500 text-[20px]">auto_awesome</span>
                 <h3 class="text-sm font-semibold text-gray-700">Top AI Search Prompts</h3>
-                <span class="text-xs text-gray-400">Questions people ask AI assistants about this topic</span>
+                <span class="text-xs text-gray-400">Questions people ask AI assistants about this topic — sorted by est. volume</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -499,7 +501,7 @@
                         <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Keyword</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Videos</th>
                         <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Avg Views</th>
-                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Engagement</th>
+                        <th class="text-right py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Avg Engagement</th>
                         <th class="text-center py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Competition</th>
                         <th class="text-left py-2 px-3 text-xs font-semibold text-gray-400 uppercase">Top Channels</th>
                     </tr>
@@ -529,19 +531,14 @@
         {% for key, yd in yt_data.items() %}{% if yd.get('is_channel') %}{% set has_channels.val = true %}{% endif %}{% endfor %}
         {% if has_channels.val %}
         <div class="mt-6 pt-6 border-t border-gray-100">
-            <h3 class="text-sm font-semibold text-gray-700 mb-1">Competitor Channel Activity — Top 5 by Engagement Rate</h3>
-            <p class="text-xs text-gray-400 mb-4">Average engagement is calculated across all videos found, not just the 5 shown below.</p>
-            {# Client channel first, then competitors sorted by engagement rate desc #}
-            {% set client_channels = [] %}
-            {% set comp_channels = [] %}
+            <h3 class="text-sm font-semibold text-gray-700 mb-1">Channel Activity — Sorted by Avg Engagement</h3>
+            <p class="text-xs text-gray-400 mb-4">Avg Engagement is calculated across all videos found, not just the 5 shown below.</p>
+            {# All channels sorted by avg_engagement_rate descending #}
+            {% set all_channels = [] %}
             {% for key, yd in yt_data.items() %}
-                {% if yd.get('is_channel') and yd.get('videos') %}
-                    {% if yd.get('is_client') %}{% set _ = client_channels.append(yd) %}
-                    {% else %}{% set _ = comp_channels.append(yd) %}{% endif %}
-                {% endif %}
+                {% if yd.get('is_channel') and yd.get('videos') %}{% set _ = all_channels.append(yd) %}{% endif %}
             {% endfor %}
-            {% set comp_channels = comp_channels | sort(attribute='avg_engagement_rate', reverse=true) %}
-            {% set channel_list = client_channels + comp_channels %}
+            {% set channel_list = all_channels | sort(attribute='avg_engagement_rate', reverse=true) %}
             {% for yd in channel_list[:5] %}
             {% if true %}
             <div class="mb-5 pb-5 border-b border-gray-100 last:border-0">
@@ -926,22 +923,33 @@
         {% for key, jd in jobs_data.items() %}
         {% if jd.get('jobs_found', 0) > 0 %}
         <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
-            <h3 class="font-semibold text-gray-700 text-sm mb-2">{{ jd.get('company', key) }} <span class="text-xs text-gray-400 font-normal">({{ jd.get('jobs_found', 0) }} roles found)</span></h3>
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="font-semibold text-gray-700 text-sm">
+                    {% if jd.get('entity_type') == 'client' %}🏢{% else %}🏬{% endif %}
+                    {{ jd.get('company', key) }}
+                    <span class="text-xs text-gray-400 font-normal">({{ jd.get('jobs_found', 0) }} roles found via LinkedIn)</span>
+                </h3>
+                {% if jd.get('see_more_url') %}<a href="{{ jd.get('see_more_url') }}" target="_blank" class="text-xs text-brand hover:underline">See all on LinkedIn →</a>{% endif %}
+            </div>
             <div class="space-y-2">
                 {% for job in jd.get('recent_jobs', [])[:5] %}
-                <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-xs">
-                    <div>
+                <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-100 text-xs">
+                    <div class="flex-1 min-w-0">
+                        {% if job.get('url') %}
+                        <a href="{{ job.get('url') }}" target="_blank" class="font-medium text-gray-800 hover:text-brand">{{ job.get('title', '') }} →</a>
+                        {% else %}
                         <p class="font-medium text-gray-800">{{ job.get('title', '') }}</p>
-                        <p class="text-gray-400">{{ job.get('location', '') }}</p>
+                        {% endif %}
+                        <p class="text-gray-400 mt-0.5">{{ job.get('location', '') }}</p>
                     </div>
-                    <span class="text-gray-400">{{ job.get('posted', '')[:10] }}</span>
+                    <span class="text-gray-400 shrink-0 ml-3">{{ job.get('posted', '')[:10] }}</span>
                 </div>
                 {% endfor %}
-                {% if jd.get('see_more_url') %}<a href="{{ jd.get('see_more_url') }}" target="_blank" class="text-xs text-brand hover:underline">See all on LinkedIn →</a>{% endif %}
                 {% if jd.get('website_jobs') %}
+                {% set wj = jd.get('website_jobs', {}) %}
                 <div class="mt-3 pt-3 border-t border-gray-100">
-                    <p class="text-xs font-semibold text-gray-500 mb-2">Also on company website <a href="{{ jd.website_jobs.get('careers_url', '#') }}" target="_blank" class="text-brand hover:underline ml-1">{{ jd.website_jobs.get('careers_url', '') }}</a></p>
-                    {% for title in jd.website_jobs.get('job_titles', [])[:5] %}
+                    <p class="text-xs font-semibold text-gray-500 mb-2">Also on company website <a href="{{ wj.get('careers_url', '#') }}" target="_blank" class="text-brand hover:underline ml-1">{{ wj.get('careers_url', '') }}</a></p>
+                    {% for title in wj.get('job_titles', [])[:5] %}
                     <div class="text-xs text-gray-600 py-1 border-b border-gray-50">{{ title }}</div>
                     {% endfor %}
                 </div>
@@ -1116,9 +1124,9 @@
       <p class="text-xs text-gray-400 mb-4">Enter traffic data manually from Ubersuggest or SimilarWeb. Leave blank to skip a row.</p>
       <div id="trafficRows" class="space-y-3">
         {% set mt = report.get_manual_data().get('traffic', []) %}
-        {% set default_rows = [{'domain': client.website, 'label': client.name, 'type': 'client', 'organic_monthly': 0, 'paid_monthly': 0, 'domain_score': 0}] %}
-        {% for comp in client.competitors %}{% set default_rows = default_rows + [{'domain': comp.website, 'label': comp.name, 'type': 'competitor', 'organic_monthly': 0, 'paid_monthly': 0, 'domain_score': 0}] %}{% endfor %}
-        {% set rows = mt if mt else default_rows %}
+        {% set ns = namespace(rows=[{'domain': client.website, 'label': client.name, 'type': 'client', 'organic_monthly': 0, 'paid_monthly': 0, 'domain_score': 0}]) %}
+        {% for comp in client.competitors %}{% set ns.rows = ns.rows + [{'domain': comp.website, 'label': comp.name, 'type': 'competitor', 'organic_monthly': 0, 'paid_monthly': 0, 'domain_score': 0}] %}{% endfor %}
+        {% set rows = mt if mt else ns.rows %}
         {% for row in rows %}
         <div class="grid grid-cols-12 gap-2 items-center text-xs">
           <div class="col-span-3"><input type="text" name="website[]" value="{{ row.get('domain','') }}" placeholder="domain.com" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>

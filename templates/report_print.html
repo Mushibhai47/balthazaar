@@ -76,8 +76,10 @@
         <div class="brand-tag">Balthazaar Intelligence</div>
         <h1>{{ client.name }}</h1>
         <div class="meta">
-            Competitive Intelligence Report &nbsp;·&nbsp; Report #{{ report.id }}<br>
-            {% if report.generated_at %}{{ report.generated_at.strftime('%B %d, %Y') }}{% else %}{{ report.created_at.strftime('%B %d, %Y') }}{% endif %}
+            Competitive Intelligence Report<br>
+            {% if query.period_start and query.period_end %}
+            {{ query.period_start.strftime('%d %B %Y') }} to {{ query.period_end.strftime('%d %B %Y') }}
+            {% elif report.generated_at %}{{ report.generated_at.strftime('%d %B %Y') }}{% else %}{{ report.created_at.strftime('%d %B %Y') }}{% endif %}
             &nbsp;·&nbsp; {{ keywords|length }} Keywords &nbsp;·&nbsp; {% if report.country %}{{ report.country }}{% else %}{{ query.get_countries()|join(', ') }}{% endif %}
         </div>
         {% if competitors %}
@@ -214,16 +216,16 @@
     <!-- AI Keywords -->
     {% if ai_data_p %}
     <div class="section">
-        <div class="section-title">Keyword Intelligence</div>
+        <div class="section-title">Keywords &amp; AI Insights</div>
         <table>
             <thead>
                 <tr>
                     <th>Keyword</th>
                     <th style="text-align:right">Volume</th>
-                    <th style="text-align:right">Avg Vol (6M)</th>
+                    <th style="text-align:right">Avg Vol (6P)*</th>
+                    <th>Trend</th>
                     <th>Competition</th>
                     <th style="text-align:right">CPC</th>
-                    <th>Trend</th>
                     <th>Insight</th>
                 </tr>
             </thead>
@@ -233,7 +235,12 @@
                 <tr>
                     <td style="font-weight:600">{{ kw }}</td>
                     <td style="text-align:right;font-family:monospace">{% if kd.get('search_volume', 0) > 0 %}{{ '{:,}'.format(kd.get('search_volume')) }}{% else %}—{% endif %}</td>
-                    <td style="text-align:right;font-family:monospace;color:#64748b">{% if kd.get('avg_volume_6m') %}{{ '{:,}'.format(kd.get('avg_volume_6m')) }}{% else %}—{% endif %}</td>
+                    <td style="text-align:right;font-family:monospace;color:#64748b">{% set avg6 = kd.get('avg_volume_6m') or kd.get('avg_volume_6p') %}{% if avg6 %}{{ '{:,}'.format(avg6) }}{% else %}—{% endif %}</td>
+                    <td>{% set t = kd.get('trend', '') %}{% set tp = kd.get('trend_pct') %}
+                        {% if t == 'rising' %}<span class="trend-up">↑{% if tp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
+                        {% elif t == 'declining' %}<span class="trend-down">↓{% if tp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
+                        {% else %}<span class="trend-stable">—</span>{% endif %}
+                    </td>
                     <td>{% set c = kd.get('competition', '') %}
                         {% if c == 'HIGH' %}<span class="badge badge-red">High</span>
                         {% elif c == 'MEDIUM' %}<span class="badge badge-amber">Med</span>
@@ -241,11 +248,6 @@
                         {% else %}—{% endif %}
                     </td>
                     <td style="text-align:right;font-family:monospace">{% if kd.get('estimated_cpc', 0) > 0 %}${{ '%.2f'|format(kd.get('estimated_cpc', 0)) }}{% else %}—{% endif %}</td>
-                    <td>{% set t = kd.get('trend', '') %}{% set tp = kd.get('trend_pct') %}
-                        {% if t == 'rising' %}<span class="trend-up">↑{% if tp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
-                        {% elif t == 'declining' %}<span class="trend-down">↓{% if tp %} <span style="font-size:9px;font-weight:400">{{ '%+.0f'|format(tp) }}%</span>{% endif %}</span>
-                        {% else %}<span class="trend-stable">—</span>{% endif %}
-                    </td>
                     <td style="color:#64748b">{{ kd.get('insight', '') or '' }}</td>
                 </tr>
                 {% endfor %}
@@ -358,7 +360,7 @@
             <div style="margin-bottom:6px">
                 <div style="font-size:8px;font-weight:700;color:#16a34a;margin-bottom:3px">TOP 5 POSITIVE</div>
                 {% for c in sd.get('top_positive', [])[:5] %}
-                <div style="font-size:9px;color:#374151;padding:3px 6px;background:#f0fdf4;border-radius:4px;margin-bottom:2px">"{{ (c.get('text','') or c.get('title','')) | striptags }}"{% if c.get('url') %} <a href="{{ c.url }}" style="color:#6B51F0">↗</a>{% elif c.get('link','').startswith('http') %} <a href="{{ c.link }}" style="color:#6B51F0">↗</a>{% endif %}</div>
+                <div style="font-size:9px;color:#374151;padding:3px 6px;background:#f0fdf4;border-radius:4px;margin-bottom:2px">"{{ (c.get('text','') or c.get('title','')) | striptags }}"{% if c.get('url') %} <a href="{{ c.url }}" target="_blank" style="color:#6B51F0">↗</a>{% elif c.get('link','').startswith('http') %} <a href="{{ c.link }}" target="_blank" style="color:#6B51F0">↗</a>{% endif %}</div>
                 {% endfor %}
             </div>
             {% endif %}
@@ -366,7 +368,7 @@
             <div>
                 <div style="font-size:8px;font-weight:700;color:#dc2626;margin-bottom:3px">TOP 5 NEGATIVE</div>
                 {% for c in sd.get('top_negative', [])[:5] %}
-                <div style="font-size:9px;color:#374151;padding:3px 6px;background:#fef2f2;border-radius:4px;margin-bottom:2px">"{{ (c.get('text','') or c.get('title','')) | striptags }}"{% if c.get('url') %} <a href="{{ c.url }}" style="color:#6B51F0">↗</a>{% elif c.get('link','').startswith('http') %} <a href="{{ c.link }}" style="color:#6B51F0">↗</a>{% endif %}</div>
+                <div style="font-size:9px;color:#374151;padding:3px 6px;background:#fef2f2;border-radius:4px;margin-bottom:2px">"{{ (c.get('text','') or c.get('title','')) | striptags }}"{% if c.get('url') %} <a href="{{ c.url }}" target="_blank" style="color:#6B51F0">↗</a>{% elif c.get('link','').startswith('http') %} <a href="{{ c.link }}" target="_blank" style="color:#6B51F0">↗</a>{% endif %}</div>
                 {% endfor %}
             </div>
             {% endif %}
@@ -393,12 +395,12 @@
                 {% for a in nd.get('articles', [])[:10] %}
                 <li>
                     <div class="news-dot"></div>
-                    <div><div style="font-weight:600;color:#1a1a2e">{% if a.get('link') %}<a href="{{ a.link }}" style="color:#1a1a2e;text-decoration:none">{{ a.get('title', '') or '' }}</a>{% else %}{{ a.get('title', '') or '' }}{% endif %}</div>
+                    <div><div style="font-weight:600;color:#1a1a2e">{% if a.get('link') %}<a href="{{ a.link }}" target="_blank" style="color:#1a1a2e;text-decoration:none">{{ a.get('title', '') or '' }}</a>{% else %}{{ a.get('title', '') or '' }}{% endif %}</div>
                     <div class="news-source">{{ a.get('source', '') }}{% if a.get('published') %} · {{ a.get('published', '')[:16] }}{% endif %}</div></div>
                 </li>
                 {% endfor %}
             </ul>
-            {% set news_q = nd.get('query', '') %}{% if news_q %}<div style="margin-top:4px;font-size:9px"><a href="https://news.google.com/search?q={{ news_q | urlencode }}" style="color:#6B51F0">View all on Google News →</a></div>{% endif %}
+            {% set news_q = nd.get('query', '') %}{% if news_q %}<div style="margin-top:4px;font-size:9px"><a href="https://news.google.com/search?q={{ news_q | urlencode }}" target="_blank" style="color:#6B51F0">View all on Google News →</a></div>{% endif %}
         </div>
         {% endif %}{% endif %}
         {% endfor %}
@@ -599,9 +601,9 @@
     {% endif %}
 
     <div class="footer">
-        <span>Confidential — {{ client.name }} · Report #{{ report.id }}</span>
+        <span>Confidential — {{ client.name }}</span>
         <span>Generated by Balthazaar Intelligence Platform</span>
-        <span>{% if report.generated_at %}{{ report.generated_at.strftime('%B %d, %Y') }}{% else %}{{ report.created_at.strftime('%B %d, %Y') }}{% endif %}</span>
+        <span>{% if query.period_start and query.period_end %}{{ query.period_start.strftime('%d %b %Y') }} – {{ query.period_end.strftime('%d %b %Y') }}{% elif report.generated_at %}{{ report.generated_at.strftime('%d %B %Y') }}{% else %}{{ report.created_at.strftime('%d %B %Y') }}{% endif %}</span>
     </div>
 </div>
 

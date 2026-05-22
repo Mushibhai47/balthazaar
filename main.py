@@ -545,6 +545,21 @@ def view_report(report_id):
         data = {}
     kw_data = data.get('keywords', {})
     ai_data = kw_data.get('openai', kw_data.get('google_gemini', {}))
+
+    # Sort keywords by search_volume descending
+    keywords = sorted(keywords, key=lambda kw: ai_data.get(kw, {}).get('search_volume', 0), reverse=True)
+
+    # Pre-sort opportunities and threats HIGH > MEDIUM > LOW
+    _prio = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+    ai_insights = ai_data.get('ai_insights', ai_data)
+    if isinstance(ai_insights, dict):
+        opps = ai_insights.get('top_opportunities', [])
+        if opps:
+            ai_insights['top_opportunities'] = sorted(opps, key=lambda x: _prio.get(x.get('priority', 'LOW'), 2))
+        threats = ai_insights.get('competitive_threats', [])
+        if threats:
+            ai_insights['competitive_threats'] = sorted(threats, key=lambda x: _prio.get(x.get('severity', 'LOW'), 2))
+
     rising_count = sum(1 for kw in keywords if ai_data.get(kw, {}).get('trend') == 'rising')
     cpc_vals = [ai_data.get(kw, {}).get('estimated_cpc', 0) for kw in keywords if ai_data.get(kw, {}).get('estimated_cpc', 0) > 0]
     avg_cpc = round(sum(cpc_vals) / len(cpc_vals), 2) if cpc_vals else 0.0
@@ -1454,9 +1469,25 @@ def print_report(report_id):
     kw_data = data.get('keywords', {})
     ai_data = kw_data.get('openai', kw_data.get('google_gemini', {}))
     metadata = data.get('metadata', {})
+
+    # Sort keywords by volume descending (same as online report)
+    keywords = sorted(keywords, key=lambda kw: ai_data.get(kw, {}).get('search_volume', 0), reverse=True)
+
+    # Pre-sort opportunities and threats HIGH > MEDIUM > LOW
+    _prio = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+    ai_insights = ai_data.get('ai_insights', ai_data)
+    if isinstance(ai_insights, dict):
+        opps = ai_insights.get('top_opportunities', [])
+        if opps:
+            ai_insights['top_opportunities'] = sorted(opps, key=lambda x: _prio.get(x.get('priority', 'LOW'), 2))
+        threats = ai_insights.get('competitive_threats', [])
+        if threats:
+            ai_insights['competitive_threats'] = sorted(threats, key=lambda x: _prio.get(x.get('severity', 'LOW'), 2))
+
     return render_template("report_print.html",
         report=report, query=query, client=client,
-        data=data, keywords=keywords, ai_data=ai_data, metadata=metadata
+        data=data, keywords=keywords, ai_data=ai_data, metadata=metadata,
+        competitors=client.competitors
     )
 
 
