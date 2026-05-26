@@ -1009,30 +1009,59 @@ def save_manual_data(report_id):
         manual["traffic"] = rows
 
     elif section == "meta_ads":
+        entity_names = request.form.getlist("entity_name[]")
+        entity_types = request.form.getlist("entity_type[]")
+        entities = []
+        for i, name in enumerate(entity_names):
+            entities.append({
+                "entity": name,
+                "type": entity_types[i] if i < len(entity_types) else "competitor",
+                "spend": request.form.getlist("meta_spend[]")[i] if i < len(request.form.getlist("meta_spend[]")) else "",
+                "impressions": request.form.getlist("meta_impressions[]")[i] if i < len(request.form.getlist("meta_impressions[]")) else "",
+                "clicks": request.form.getlist("meta_clicks[]")[i] if i < len(request.form.getlist("meta_clicks[]")) else "",
+                "ctr": request.form.getlist("meta_ctr[]")[i] if i < len(request.form.getlist("meta_ctr[]")) else "",
+                "cpc": request.form.getlist("meta_cpc[]")[i] if i < len(request.form.getlist("meta_cpc[]")) else "",
+                "leads": request.form.getlist("meta_leads[]")[i] if i < len(request.form.getlist("meta_leads[]")) else "",
+                "cost_per_lead": request.form.getlist("meta_cpl[]")[i] if i < len(request.form.getlist("meta_cpl[]")) else "",
+                "roas": request.form.getlist("meta_roas[]")[i] if i < len(request.form.getlist("meta_roas[]")) else "",
+                "notes": request.form.getlist("meta_notes[]")[i] if i < len(request.form.getlist("meta_notes[]")) else "",
+            })
         manual["meta_ads"] = {
             "period": request.form.get("period", ""),
-            "spend": request.form.get("spend", ""),
-            "impressions": request.form.get("impressions", ""),
-            "clicks": request.form.get("clicks", ""),
-            "ctr": request.form.get("ctr", ""),
-            "cpc": request.form.get("cpc", ""),
-            "leads": request.form.get("leads", ""),
-            "cost_per_lead": request.form.get("cost_per_lead", ""),
-            "roas": request.form.get("roas", ""),
-            "notes": request.form.get("notes", ""),
+            "entities": entities,
+            # legacy single-entity fields kept for backward compat
+            "spend": "",
+            "impressions": "",
+            "clicks": "",
+            "ctr": "",
+            "cpc": "",
+            "leads": "",
+            "cost_per_lead": "",
+            "roas": "",
+            "notes": "",
         }
 
     elif section == "google_ads":
         manual["google_ads"] = {
+        g_entity_names = request.form.getlist("entity_name[]")
+        g_entity_types = request.form.getlist("entity_type[]")
+        g_entities = []
+        for i, name in enumerate(g_entity_names):
+            g_entities.append({
+                "entity": name,
+                "type": g_entity_types[i] if i < len(g_entity_types) else "competitor",
+                "spend": request.form.getlist("g_spend[]")[i] if i < len(request.form.getlist("g_spend[]")) else "",
+                "impressions": request.form.getlist("g_impressions[]")[i] if i < len(request.form.getlist("g_impressions[]")) else "",
+                "clicks": request.form.getlist("g_clicks[]")[i] if i < len(request.form.getlist("g_clicks[]")) else "",
+                "ctr": request.form.getlist("g_ctr[]")[i] if i < len(request.form.getlist("g_ctr[]")) else "",
+                "cpc": request.form.getlist("g_cpc[]")[i] if i < len(request.form.getlist("g_cpc[]")) else "",
+                "conversions": request.form.getlist("g_conversions[]")[i] if i < len(request.form.getlist("g_conversions[]")) else "",
+                "cost_per_conversion": request.form.getlist("g_cpa[]")[i] if i < len(request.form.getlist("g_cpa[]")) else "",
+                "notes": request.form.getlist("g_notes[]")[i] if i < len(request.form.getlist("g_notes[]")) else "",
+            })
+        manual["google_ads"] = {
             "period": request.form.get("period", ""),
-            "spend": request.form.get("spend", ""),
-            "impressions": request.form.get("impressions", ""),
-            "clicks": request.form.get("clicks", ""),
-            "ctr": request.form.get("ctr", ""),
-            "cpc": request.form.get("cpc", ""),
-            "conversions": request.form.get("conversions", ""),
-            "cost_per_conversion": request.form.get("cost_per_conversion", ""),
-            "notes": request.form.get("notes", ""),
+            "entities": g_entities,
         }
 
     report.manual_data = json.dumps(manual)
