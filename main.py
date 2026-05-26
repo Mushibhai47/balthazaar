@@ -17,6 +17,9 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
 
+import html as _html
+app.jinja_env.filters['unescape'] = _html.unescape
+
 
 # --- Auth helpers ---
 def admin_required(f):
