@@ -42,12 +42,14 @@ def load_credentials(service_name: str):
     env_map = ENV_CREDENTIAL_MAP.get(service_name, {})
 
     if db_creds is not None:
-        # Overlay any env vars that aren't set in DB creds (e.g. bearer_token added later)
+        # Overlay env vars into DB creds where the env var has a value.
+        # For ubersuggest bearer_token specifically, always prefer the env var
+        # (tokens expire and users update Replit secrets without updating the DB).
         if env_map:
             for field, env_var in env_map.items():
-                if not db_creds.get(field):
-                    env_val = os.environ.get(env_var, '')
-                    if env_val:
+                env_val = os.environ.get(env_var, '')
+                if env_val:
+                    if not db_creds.get(field) or (service_name == 'ubersuggest' and field == 'bearer_token'):
                         db_creds[field] = env_val
                         logger.info(f"[{service_name}] Overlaid {field} from env var {env_var}")
         return db_creds
