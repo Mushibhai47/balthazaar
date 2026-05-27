@@ -92,16 +92,21 @@ class OpenAICollector(BaseKeywordCollector):
 Keywords: {keywords_str}
 
 For each keyword, provide:
-1. Estimated monthly search volume (number)
-2. Competition level (LOW, MEDIUM, HIGH)
-3. Estimated CPC in USD (if applicable)
-4. Search intent (informational, navigational, transactional, commercial)
-5. Brief strategic insight (1 sentence)
+1. Estimated monthly search volume for the current period (number)
+2. Estimated average monthly search volume over the last 6 identical periods (number) — e.g. if reporting fortnightly, average over last 6 fortnights
+3. Trend: is search volume rising, declining, or stable? Include estimated % change vs previous period
+4. Competition level (LOW, MEDIUM, HIGH)
+5. Estimated CPC in USD (if applicable)
+6. Search intent (informational, navigational, transactional, commercial)
+7. Brief strategic insight (1 sentence)
 
 Format your response as JSON with this structure:
 {{
   "keyword_name": {{
     "search_volume": 10000,
+    "avg_volume_6p": 9500,
+    "trend": "rising",
+    "trend_pct": 12.5,
     "competition": "MEDIUM",
     "estimated_cpc": 2.50,
     "intent": "commercial",
