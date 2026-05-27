@@ -233,13 +233,16 @@
     ═══════════════════════════════════════ #}
     {% set manual = report.get_manual_data() %}
     {% set manual_traffic = manual.get('traffic', []) %}
-    {% set show_traffic = traffic_data or manual_traffic %}
+    {# Only use API traffic if it has real non-zero data #}
+    {% set has_real_traffic = namespace(val=false) %}
+    {% for k, v in traffic_data.items() %}{% if v.get('total_monthly', 0) > 0 or v.get('organic_monthly', 0) > 0 %}{% set has_real_traffic.val = true %}{% endif %}{% endfor %}
+    {% set show_traffic = has_real_traffic.val or manual_traffic %}
     <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
         <div class="flex items-center justify-between mb-5">
             <div class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-indigo-500 text-[22px]">bar_chart</span>
                 <h2 class="text-lg font-semibold text-gray-800">Website Traffic</h2>
-                {% if manual_traffic and not traffic_data %}<span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100">Manually entered</span>{% endif %}
+                {% if manual_traffic and not has_real_traffic.val %}<span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100">Manually entered</span>{% endif %}
             </div>
             {% if not portal_token %}
             <button onclick="document.getElementById('trafficModal').classList.remove('hidden')" class="text-xs text-brand border border-brand rounded-lg px-3 py-1.5 hover:bg-brand hover:text-white transition flex items-center gap-1">
@@ -260,7 +263,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% if traffic_data %}
+                    {% if has_real_traffic.val %}
                     {% for key, td in traffic_data.items() %}
                     <tr class="border-b border-gray-50 hover:bg-indigo-50/20 transition">
                         <td class="py-3 px-3 font-medium text-sm">
