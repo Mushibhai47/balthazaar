@@ -1,0 +1,1 @@
+- [Recurring post-pull bugs](recurring-pull-bugs.md) — known patterns that re-appear after the developer's GitHub merges; always grep before declaring a pull clean.

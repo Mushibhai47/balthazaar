@@ -1042,7 +1042,6 @@ def save_manual_data(report_id):
         }
 
     elif section == "google_ads":
-        manual["google_ads"] = {
         g_entity_names = request.form.getlist("entity_name[]")
         g_entity_types = request.form.getlist("entity_type[]")
         g_entities = []
