@@ -233,6 +233,7 @@
     ═══════════════════════════════════════ #}
     {% set manual = report.get_manual_data() %}
     {% set manual_traffic = manual.get('traffic', []) %}
+    {% set manual_yt_channels_global = manual.get('youtube_channels', []) %}
     {# Only use API traffic if it has real non-zero data #}
     {% set has_real_traffic = namespace(val=false) %}
     {% for k, v in traffic_data.items() %}{% if v.get('total_monthly', 0) > 0 or v.get('organic_monthly', 0) > 0 %}{% set has_real_traffic.val = true %}{% endif %}{% endfor %}
@@ -491,12 +492,13 @@
     {# ═══════════════════════════════════════
        SECTION 2: YOUTUBE PERFORMANCE
     ═══════════════════════════════════════ #}
-    {% if yt_data %}
+    {% if yt_data or manual_yt_channels_global %}
     <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
         <div class="flex items-center gap-2 mb-5">
             <span class="material-symbols-outlined text-red-500 text-[22px]">play_circle</span>
             <h2 class="text-lg font-semibold text-gray-800">YouTube Performance</h2>
         </div>
+        {% if yt_data %}
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
@@ -530,35 +532,57 @@
                 </tbody>
             </table>
         </div>
+        {% endif %}
         {% set has_channels = namespace(val=false) %}
         {% for key, yd in yt_data.items() %}{% if yd.get('is_channel') %}{% set has_channels.val = true %}{% endif %}{% endfor %}
-        {% if has_channels.val %}
+        {% set manual_yt_channels = manual.get('youtube_channels', []) %}
+        {% if has_channels.val or manual_yt_channels %}
         <div class="mt-6 pt-6 border-t border-gray-100">
-            <h3 class="text-sm font-semibold text-gray-700 mb-1">Channel Activity — Sorted by Avg Engagement</h3>
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="text-sm font-semibold text-gray-700">Channel Activity — Sorted by Avg Engagement</h3>
+                {% if not portal_token %}
+                <button onclick="document.getElementById('ytChannelsModal').classList.remove('hidden')"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition no-print">
+                    <span class="material-symbols-outlined text-[13px]">edit</span> Edit Channels
+                </button>
+                {% endif %}
+            </div>
             <p class="text-xs text-gray-400 mb-4">Avg Engagement is calculated across all videos found, not just the 5 shown below.</p>
-            {# All channels sorted by avg_engagement_rate descending #}
+            {# Build combined channel list: scraped first, then manual ones not already present #}
             {% set all_channels = [] %}
             {% for key, yd in yt_data.items() %}
                 {% if yd.get('is_channel') and yd.get('videos') %}{% set _ = all_channels.append(yd) %}{% endif %}
             {% endfor %}
+            {# Add manual channels whose name isn't already in scraped data #}
+            {% set scraped_names = [] %}
+            {% for ch in all_channels %}{% set _ = scraped_names.append(ch.get('company', '').lower()) %}{% endfor %}
+            {% for mch in manual_yt_channels %}
+                {% if mch.get('name', '').lower() not in scraped_names %}
+                    {% set _ = all_channels.append({'company': mch.name, 'is_client': mch.type == 'client', 'avg_views': mch.avg_views, 'avg_engagement_rate': mch.avg_engagement_rate, 'videos': mch.get('videos', []), '_manual': true}) %}
+                {% endif %}
+            {% endfor %}
             {% set channel_list = all_channels | sort(attribute='avg_engagement_rate', reverse=true) %}
-            {% for yd in channel_list[:5] %}
-            {% if true %}
+            {% for yd in channel_list[:6] %}
             <div class="mb-5 pb-5 border-b border-gray-100 last:border-0">
                 <div class="flex items-center justify-between mb-3">
-                    <h4 class="font-medium text-sm {% if yd.get('is_client') %}text-brand{% else %}text-gray-700{% endif %}">
-                        {% if yd.get('is_client') %}🏢{% else %}🏬{% endif %} {{ yd.get('company', '') }}
-                    </h4>
+                    <div class="flex items-center gap-2">
+                        <h4 class="font-medium text-sm {% if yd.get('is_client') %}text-brand{% else %}text-gray-700{% endif %}">
+                            {% if yd.get('is_client') %}🏢{% else %}🏬{% endif %} {{ yd.get('company', '') }}
+                        </h4>
+                        {% if yd.get('_manual') %}<span class="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100">Manual</span>{% endif %}
+                    </div>
                     <div class="flex gap-4 text-xs text-gray-400">
                         <span>Avg Views: <strong class="text-gray-700">{{ '{:,}'.format(yd.get('avg_views', 0)) }}</strong></span>
                         <span>Avg Engagement: <strong class="text-gray-700">{{ yd.get('avg_engagement_rate', 0) }}%</strong></span>
                     </div>
                 </div>
+                {% if yd.get('videos') %}
                 <div class="space-y-2">
                 {% for video in yd.get('videos', [])[:5] %}
                 <div class="flex items-center justify-between p-2 bg-red-50/30 rounded-lg border border-red-100/50 text-xs">
                     <div class="flex-1 min-w-0 mr-3">
-                        <a href="{{ video.get('url', '#') }}" target="_blank" class="font-medium text-gray-800 hover:text-brand line-clamp-1">{{ video.get('title', '') }}</a>
+                        {% if video.get('url') %}<a href="{{ video.get('url', '#') }}" target="_blank" class="font-medium text-gray-800 hover:text-brand line-clamp-1">{{ video.get('title', '') }}</a>
+                        {% else %}<span class="font-medium text-gray-800 line-clamp-1">{{ video.get('title', '') }}</span>{% endif %}
                         <span class="text-gray-400">{{ video.get('published', '') }}</span>
                     </div>
                     <div class="flex gap-3 shrink-0 text-gray-500 font-mono">
@@ -568,8 +592,10 @@
                 </div>
                 {% endfor %}
                 </div>
+                {% else %}
+                <p class="text-xs text-gray-400 italic">No videos recorded for this period.</p>
+                {% endif %}
             </div>
-            {% endif %}
             {% endfor %}
         </div>
         {% endif %}
@@ -1263,6 +1289,54 @@
       <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
         <button type="button" onclick="document.getElementById('googleAdsModal').classList.add('hidden')" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">Cancel</button>
         <button type="submit" class="px-5 py-2.5 rounded-xl bg-yellow-500 text-white text-sm font-medium hover:bg-yellow-600 transition">Save Google Ads Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── YOUTUBE CHANNELS MANUAL DATA MODAL ── #}
+<div id="ytChannelsModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8">
+    <div class="flex items-center justify-between p-6 border-b border-gray-100">
+      <h3 class="font-semibold text-gray-800">Edit YouTube Channel Activity</h3>
+      <button onclick="document.getElementById('ytChannelsModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    {% set myt = report.get_manual_data().get('youtube_channels', []) %}
+    {% set ns_yt = namespace(rows=[{'entity': client.name, 'type': 'client'}]) %}
+    {% for comp in client.competitors %}{% set ns_yt.rows = ns_yt.rows + [{'entity': comp.name, 'type': 'competitor'}] %}{% endfor %}
+    <form method="post" action="/reports/{{ report.id }}/manual-data" class="p-6">
+      <input type="hidden" name="section" value="youtube_channels">
+      <p class="text-xs text-gray-400 mb-5">Enter YouTube channel stats for entities not tracked automatically. Leave blank to skip.</p>
+      <div class="space-y-6">
+        {% for i in range(ns_yt.rows|length) %}
+        {% set row = ns_yt.rows[i] %}
+        {% set saved_ch = {} %}
+        {% for ch in myt %}{% if ch.get('name') == row.entity %}{% set saved_ch = ch %}{% endif %}{% endfor %}
+        <div class="border border-gray-100 rounded-xl p-4 {% if row.type == 'client' %}bg-red-50/30{% else %}bg-gray-50{% endif %}">
+          <p class="text-xs font-bold text-gray-700 mb-3">{% if row.type == 'client' %}🏢{% else %}🏬{% endif %} {{ row.entity }}</p>
+          <input type="hidden" name="yt_entity_name[]" value="{{ row.entity }}">
+          <input type="hidden" name="yt_entity_type[]" value="{{ row.type }}">
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div><label class="text-[10px] text-gray-400 block mb-0.5">Avg Views per Video</label><input type="text" name="yt_avg_views[]" value="{{ saved_ch.get('avg_views','') }}" placeholder="e.g. 9509" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+            <div><label class="text-[10px] text-gray-400 block mb-0.5">Avg Engagement Rate (%)</label><input type="text" name="yt_avg_eng[]" value="{{ saved_ch.get('avg_engagement_rate','') }}" placeholder="e.g. 4.08" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          </div>
+          <p class="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">Videos this period (up to 5) — Title / Date / Views / Eng% / URL</p>
+          {% for j in range(5) %}
+          {% set sv = saved_ch.get('videos', [])[j] if j < (saved_ch.get('videos', []) | length) else {} %}
+          <div class="grid grid-cols-12 gap-1.5 mb-1.5 items-center">
+            <div class="col-span-4"><input type="text" name="yt_video_title_{{ i }}[]" value="{{ sv.get('title','') }}" placeholder="Video title" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+            <div class="col-span-2"><input type="text" name="yt_video_date_{{ i }}[]" value="{{ sv.get('published','') }}" placeholder="YYYY-MM-DD" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+            <div class="col-span-2"><input type="text" name="yt_video_views_{{ i }}[]" value="{{ sv.get('views','') }}" placeholder="Views" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+            <div class="col-span-2"><input type="text" name="yt_video_eng_{{ i }}[]" value="{{ sv.get('engagement_rate','') }}" placeholder="Eng %" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+            <div class="col-span-2"><input type="text" name="yt_video_url_{{ i }}[]" value="{{ sv.get('url','') }}" placeholder="YouTube URL" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+        <button type="button" onclick="document.getElementById('ytChannelsModal').classList.add('hidden')" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">Cancel</button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition">Save Channel Data</button>
       </div>
     </form>
   </div>

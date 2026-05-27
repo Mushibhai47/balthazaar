@@ -329,8 +329,10 @@
 
     <!-- YouTube Competitor Channels -->
     {% set yt_data_p = kw_data.get('youtube', {}) %}
+    {% set manual_yt_p = report.get_manual_data().get('youtube_channels', []) %}
     {% set has_channels_p = namespace(val=false) %}
     {% for key, yd in yt_data_p.items() %}{% if yd.get('is_channel') and yd.get('videos') %}{% set has_channels_p.val = true %}{% endif %}{% endfor %}
+    {% if not has_channels_p.val and manual_yt_p %}{% set has_channels_p.val = true %}{% endif %}
     {% if has_channels_p.val %}
     <div class="section page-break">
         <div class="section-title">Channel Activity — Sorted by Avg Engagement</div>
@@ -338,12 +340,21 @@
         {% for key, yd in yt_data_p.items() %}
             {% if yd.get('is_channel') and yd.get('videos') %}{% set _ = all_chs.append(yd) %}{% endif %}
         {% endfor %}
+        {% set scraped_chs = [] %}
+        {% for ch in all_chs %}{% set _ = scraped_chs.append(ch.get('company','').lower()) %}{% endfor %}
+        {% for mch in manual_yt_p %}
+            {% if mch.get('name','').lower() not in scraped_chs %}
+                {% set _ = all_chs.append({'company': mch.get('name',''), 'is_client': mch.get('type') == 'client', 'avg_views': mch.get('avg_views',0), 'avg_engagement_rate': mch.get('avg_engagement_rate',0), 'videos': mch.get('videos',[]), '_manual': true}) %}
+            {% endif %}
+        {% endfor %}
         {% for yd in all_chs | sort(attribute='avg_engagement_rate', reverse=true) %}
         <div style="margin-bottom:14px">
             <div style="font-weight:700;font-size:11px;color:{% if yd.get('is_client') %}#6B51F0{% else %}#1a1a2e{% endif %};margin-bottom:4px">
                 {% if yd.get('is_client') %}🏢{% else %}🏬{% endif %} {{ yd.get('company','') }}
+                {% if yd.get('_manual') %}<span style="font-size:8px;color:#d97706;background:#fef3c7;padding:1px 4px;border-radius:3px">manual</span>{% endif %}
                 <span style="font-weight:400;font-size:9px;color:#94a3b8">Avg Views: {{ '{:,}'.format(yd.get('avg_views',0)) }} · Avg Engagement: {{ yd.get('avg_engagement_rate',0) }}%</span>
             </div>
+            {% if yd.get('videos') %}
             <table><tbody>
             {% for video in yd.get('videos',[])[:5] %}
             <tr>
@@ -354,6 +365,7 @@
             </tr>
             {% endfor %}
             </tbody></table>
+            {% else %}<p style="font-size:9px;color:#94a3b8;font-style:italic">No videos recorded for this period.</p>{% endif %}
         </div>
         {% endfor %}
     </div>

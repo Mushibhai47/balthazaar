@@ -1063,6 +1063,55 @@ def save_manual_data(report_id):
             "entities": g_entities,
         }
 
+    elif section == "youtube_channels":
+        entity_names = request.form.getlist("yt_entity_name[]")
+        entity_types = request.form.getlist("yt_entity_type[]")
+        channels = []
+        for i, name in enumerate(entity_names):
+            if not name.strip():
+                continue
+            # Parse up to 5 videos for this entity
+            videos = []
+            titles = request.form.getlist(f"yt_video_title_{i}[]")
+            dates = request.form.getlist(f"yt_video_date_{i}[]")
+            views_list = request.form.getlist(f"yt_video_views_{i}[]")
+            eng_list = request.form.getlist(f"yt_video_eng_{i}[]")
+            url_list = request.form.getlist(f"yt_video_url_{i}[]")
+            for j, title in enumerate(titles):
+                if not title.strip():
+                    continue
+                try:
+                    v = int(str(views_list[j]).replace(",", "")) if j < len(views_list) and views_list[j] else 0
+                except Exception:
+                    v = 0
+                try:
+                    e = float(eng_list[j]) if j < len(eng_list) and eng_list[j] else 0.0
+                except Exception:
+                    e = 0.0
+                videos.append({
+                    "title": title.strip(),
+                    "published": dates[j].strip() if j < len(dates) else "",
+                    "views": v,
+                    "engagement_rate": e,
+                    "url": url_list[j].strip() if j < len(url_list) else "",
+                })
+            try:
+                avg_views = int(str(request.form.getlist("yt_avg_views[]")[i]).replace(",", "")) if i < len(request.form.getlist("yt_avg_views[]")) else 0
+            except Exception:
+                avg_views = 0
+            try:
+                avg_eng = float(request.form.getlist("yt_avg_eng[]")[i]) if i < len(request.form.getlist("yt_avg_eng[]")) else 0.0
+            except Exception:
+                avg_eng = 0.0
+            channels.append({
+                "name": name.strip(),
+                "type": entity_types[i] if i < len(entity_types) else "competitor",
+                "avg_views": avg_views,
+                "avg_engagement_rate": avg_eng,
+                "videos": videos,
+            })
+        manual["youtube_channels"] = channels
+
     report.manual_data = json.dumps(manual)
     db.session.commit()
     flash(f"Manual data saved.", "success")
