@@ -549,19 +549,33 @@ def view_report(report_id):
     kw_data = data.get('keywords', {})
     ai_data = kw_data.get('openai', kw_data.get('google_gemini', {}))
 
-    # Sort keywords by search_volume descending
-    keywords = sorted(keywords, key=lambda kw: ai_data.get(kw, {}).get('search_volume', 0), reverse=True)
+    # Sort keywords by competition (HIGH > MEDIUM > LOW) then search_volume descending
+    _comp_order = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+    keywords = sorted(keywords, key=lambda kw: (
+        _comp_order.get(ai_data.get(kw, {}).get('competition', ''), 3),
+        -ai_data.get(kw, {}).get('search_volume', 0)
+    ))
 
-    # Pre-sort opportunities and threats HIGH > MEDIUM > LOW
+    # Sort AI prompts by competition then volume
+    ai_prompts = sorted(
+        ai_data.get('_ai_prompts', []),
+        key=lambda p: (_comp_order.get(p.get('competition', ''), 3), -p.get('search_volume', 0))
+    )
+
+    # Sort executive summary opportunities and threats HIGH > MEDIUM > LOW
     _prio = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
-    ai_insights = ai_data.get('ai_insights', ai_data)
-    if isinstance(ai_insights, dict):
-        opps = ai_insights.get('top_opportunities', [])
+    exec_insights = kw_data.get('ai_insights', {})
+    if exec_insights:
+        opps = exec_insights.get('top_opportunities', [])
         if opps:
-            ai_insights['top_opportunities'] = sorted(opps, key=lambda x: _prio.get(x.get('priority', 'LOW'), 2))
-        threats = ai_insights.get('competitive_threats', [])
+            exec_insights['top_opportunities'] = sorted(opps, key=lambda x: _prio.get(x.get('priority', 'LOW'), 2))
+        threats = exec_insights.get('competitive_threats', [])
         if threats:
-            ai_insights['competitive_threats'] = sorted(threats, key=lambda x: _prio.get(x.get('severity', 'LOW'), 2))
+            exec_insights['competitive_threats'] = sorted(threats, key=lambda x: _prio.get(x.get('severity', 'LOW'), 2))
+
+    # Sort YouTube keyword table by engagement_rate descending
+    yt_data_sort = kw_data.get('youtube', {})
+    yt_keywords = sorted(keywords, key=lambda kw: yt_data_sort.get(kw, {}).get('engagement_rate', 0), reverse=True)
 
     rising_count = sum(1 for kw in keywords if ai_data.get(kw, {}).get('trend') == 'rising')
     cpc_vals = [ai_data.get(kw, {}).get('estimated_cpc', 0) for kw in keywords if ai_data.get(kw, {}).get('estimated_cpc', 0) > 0]
@@ -571,7 +585,7 @@ def view_report(report_id):
     competitors = client.competitors
     return render_template("report_detail.html",
         report=report, query=query, client=client,
-        data=data, keywords=keywords,
+        data=data, keywords=keywords, yt_keywords=yt_keywords, ai_prompts=ai_prompts,
         rising_count=rising_count, avg_cpc=avg_cpc,
         metadata=metadata, competitors=competitors
     )
@@ -1013,6 +1027,15 @@ def save_manual_data(report_id):
         entity_types = request.form.getlist("entity_type[]")
         entities = []
         for i, name in enumerate(entity_names):
+            ads = []
+            for j in range(5):
+                image_url = request.form.get(f"meta_ad_image_{i}_{j}", "").strip()
+                ad_link = request.form.get(f"meta_ad_link_{i}_{j}", "").strip()
+                started_date = request.form.get(f"meta_ad_started_{i}_{j}", "").strip()
+                platforms = request.form.getlist(f"meta_ad_platforms_{i}_{j}[]")
+                if image_url or ad_link or started_date:
+                    ads.append({"image_url": image_url, "link": ad_link, "started_date": started_date, "platforms": platforms})
+            link_to_all = request.form.getlist("meta_link_to_all[]")[i] if i < len(request.form.getlist("meta_link_to_all[]")) else ""
             entities.append({
                 "entity": name,
                 "type": entity_types[i] if i < len(entity_types) else "competitor",
@@ -1025,6 +1048,8 @@ def save_manual_data(report_id):
                 "cost_per_lead": request.form.getlist("meta_cpl[]")[i] if i < len(request.form.getlist("meta_cpl[]")) else "",
                 "roas": request.form.getlist("meta_roas[]")[i] if i < len(request.form.getlist("meta_roas[]")) else "",
                 "notes": request.form.getlist("meta_notes[]")[i] if i < len(request.form.getlist("meta_notes[]")) else "",
+                "link_to_all_ads": link_to_all.strip() if link_to_all else "",
+                "ads": ads,
             })
         manual["meta_ads"] = {
             "period": request.form.get("period", ""),
@@ -1046,6 +1071,14 @@ def save_manual_data(report_id):
         g_entity_types = request.form.getlist("entity_type[]")
         g_entities = []
         for i, name in enumerate(g_entity_names):
+            g_ads = []
+            for j in range(5):
+                g_image_url = request.form.get(f"g_ad_image_{i}_{j}", "").strip()
+                g_ad_link = request.form.get(f"g_ad_link_{i}_{j}", "").strip()
+                g_last_shown = request.form.get(f"g_ad_last_shown_{i}_{j}", "").strip()
+                if g_image_url or g_ad_link or g_last_shown:
+                    g_ads.append({"image_url": g_image_url, "link": g_ad_link, "last_shown": g_last_shown})
+            g_link_to_all = request.form.getlist("g_link_to_all[]")[i] if i < len(request.form.getlist("g_link_to_all[]")) else ""
             g_entities.append({
                 "entity": name,
                 "type": g_entity_types[i] if i < len(g_entity_types) else "competitor",
@@ -1057,6 +1090,8 @@ def save_manual_data(report_id):
                 "conversions": request.form.getlist("g_conversions[]")[i] if i < len(request.form.getlist("g_conversions[]")) else "",
                 "cost_per_conversion": request.form.getlist("g_cpa[]")[i] if i < len(request.form.getlist("g_cpa[]")) else "",
                 "notes": request.form.getlist("g_notes[]")[i] if i < len(request.form.getlist("g_notes[]")) else "",
+                "link_to_all_ads": g_link_to_all.strip() if g_link_to_all else "",
+                "ads": g_ads,
             })
         manual["google_ads"] = {
             "period": request.form.get("period", ""),
@@ -1111,6 +1146,45 @@ def save_manual_data(report_id):
                 "videos": videos,
             })
         manual["youtube_channels"] = channels
+
+    elif section == "reviews":
+        rev_entity_names = request.form.getlist("rev_entity_name[]")
+        rev_entity_types = request.form.getlist("rev_entity_type[]")
+        rev_platforms = request.form.getlist("rev_platform[]")
+        rev_urls = request.form.getlist("rev_url[]")
+        rev_avg_ratings = request.form.getlist("rev_avg_rating[]")
+        rev_totals = request.form.getlist("rev_total[]")
+        reviews_entries = []
+        for i, name in enumerate(rev_entity_names):
+            if not name.strip():
+                continue
+            snippets = []
+            for j in range(5):
+                text = request.form.get(f"rev_text_{i}_{j}", "").strip()
+                try:
+                    rating = int(request.form.get(f"rev_rating_{i}_{j}", "") or 0)
+                except Exception:
+                    rating = 0
+                if text:
+                    snippets.append({"text": text, "rating": rating})
+            try:
+                avg_r = float(rev_avg_ratings[i]) if i < len(rev_avg_ratings) and rev_avg_ratings[i] else 0.0
+            except Exception:
+                avg_r = 0.0
+            try:
+                total_r = int(rev_totals[i]) if i < len(rev_totals) and rev_totals[i] else 0
+            except Exception:
+                total_r = 0
+            reviews_entries.append({
+                "entity": name.strip(),
+                "type": rev_entity_types[i] if i < len(rev_entity_types) else "competitor",
+                "platform": rev_platforms[i].strip() if i < len(rev_platforms) and rev_platforms[i] else "",
+                "review_url": rev_urls[i].strip() if i < len(rev_urls) and rev_urls[i] else "",
+                "avg_rating": avg_r,
+                "total_reviews": total_r,
+                "reviews": snippets,
+            })
+        manual["reviews"] = reviews_entries
 
     report.manual_data = json.dumps(manual)
     db.session.commit()
@@ -1550,23 +1624,35 @@ def print_report(report_id):
     ai_data = kw_data.get('openai', kw_data.get('google_gemini', {}))
     metadata = data.get('metadata', {})
 
-    # Sort keywords by volume descending (same as online report)
-    keywords = sorted(keywords, key=lambda kw: ai_data.get(kw, {}).get('search_volume', 0), reverse=True)
+    # Sort keywords by competition (HIGH > MEDIUM > LOW) then search_volume descending
+    _comp_order = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+    keywords = sorted(keywords, key=lambda kw: (
+        _comp_order.get(ai_data.get(kw, {}).get('competition', ''), 3),
+        -ai_data.get(kw, {}).get('search_volume', 0)
+    ))
 
-    # Pre-sort opportunities and threats HIGH > MEDIUM > LOW
+    # Sort AI prompts by competition then volume
+    ai_prompts = sorted(
+        ai_data.get('_ai_prompts', []),
+        key=lambda p: (_comp_order.get(p.get('competition', ''), 3), -p.get('search_volume', 0))
+    )
+
+    # Sort executive summary opportunities and threats HIGH > MEDIUM > LOW
     _prio = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
-    ai_insights = ai_data.get('ai_insights', ai_data)
-    if isinstance(ai_insights, dict):
-        opps = ai_insights.get('top_opportunities', [])
+    exec_insights = kw_data.get('ai_insights', {})
+    if exec_insights:
+        opps = exec_insights.get('top_opportunities', [])
         if opps:
-            ai_insights['top_opportunities'] = sorted(opps, key=lambda x: _prio.get(x.get('priority', 'LOW'), 2))
-        threats = ai_insights.get('competitive_threats', [])
+            exec_insights['top_opportunities'] = sorted(opps, key=lambda x: _prio.get(x.get('priority', 'LOW'), 2))
+        threats = exec_insights.get('competitive_threats', [])
         if threats:
-            ai_insights['competitive_threats'] = sorted(threats, key=lambda x: _prio.get(x.get('severity', 'LOW'), 2))
+            exec_insights['competitive_threats'] = sorted(threats, key=lambda x: _prio.get(x.get('severity', 'LOW'), 2))
 
+    yt_data_sort = kw_data.get('youtube', {})
+    yt_keywords = sorted(keywords, key=lambda kw: yt_data_sort.get(kw, {}).get('engagement_rate', 0), reverse=True)
     return render_template("report_print.html",
         report=report, query=query, client=client,
-        data=data, keywords=keywords, ai_data=ai_data, metadata=metadata,
+        data=data, keywords=keywords, yt_keywords=yt_keywords, ai_prompts=ai_prompts, ai_data=ai_data, metadata=metadata,
         competitors=client.competitors
     )
 
@@ -1626,13 +1712,33 @@ def portal_report(token, report_id):
         data = {}
     kw_data = data.get('keywords', {})
     ai_data = kw_data.get('openai', kw_data.get('google_gemini', {}))
+    _comp_order = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+    keywords = sorted(keywords, key=lambda kw: (
+        _comp_order.get(ai_data.get(kw, {}).get('competition', ''), 3),
+        -ai_data.get(kw, {}).get('search_volume', 0)
+    ))
+    ai_prompts = sorted(
+        ai_data.get('_ai_prompts', []),
+        key=lambda p: (_comp_order.get(p.get('competition', ''), 3), -p.get('search_volume', 0))
+    )
+    _prio = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+    exec_insights = kw_data.get('ai_insights', {})
+    if exec_insights:
+        opps = exec_insights.get('top_opportunities', [])
+        if opps:
+            exec_insights['top_opportunities'] = sorted(opps, key=lambda x: _prio.get(x.get('priority', 'LOW'), 2))
+        threats = exec_insights.get('competitive_threats', [])
+        if threats:
+            exec_insights['competitive_threats'] = sorted(threats, key=lambda x: _prio.get(x.get('severity', 'LOW'), 2))
+    yt_data_sort = kw_data.get('youtube', {})
+    yt_keywords = sorted(keywords, key=lambda kw: yt_data_sort.get(kw, {}).get('engagement_rate', 0), reverse=True)
     rising_count = sum(1 for kw in keywords if ai_data.get(kw, {}).get('trend') == 'rising')
     cpc_vals = [ai_data.get(kw, {}).get('estimated_cpc', 0) for kw in keywords if ai_data.get(kw, {}).get('estimated_cpc', 0) > 0]
     avg_cpc = round(sum(cpc_vals) / len(cpc_vals), 2) if cpc_vals else 0.0
     metadata = data.get('metadata', {})
     return render_template("report_detail.html",
         report=report, query=query, client=client,
-        data=data, keywords=keywords,
+        data=data, keywords=keywords, yt_keywords=yt_keywords, ai_prompts=ai_prompts,
         rising_count=rising_count, avg_cpc=avg_cpc,
         metadata=metadata, competitors=client.competitors,
         portal_token=token

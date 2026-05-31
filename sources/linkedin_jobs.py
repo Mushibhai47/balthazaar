@@ -120,10 +120,15 @@ class LinkedInJobsCollector(BaseKeywordCollector):
                     resp = requests.get(url, headers=HEADERS, timeout=10)
                     if resp.status_code == 200 and len(resp.text) > 500:
                         # Extract job titles using common patterns
-                        titles = _re.findall(
+                        _nav_skip = {'about us', 'about', 'home', 'contact', 'contact us', 'careers', 'jobs',
+                                     'how we hire', 'life at', 'our team', 'team', 'blog', 'news',
+                                     'services', 'products', 'solutions', 'login', 'sign in', 'sign up',
+                                     'get started', 'privacy policy', 'terms', 'faq', 'support'}
+                        raw_titles = _re.findall(
                             r'(?:job-title|position|role|opening)[^>]*>([^<]{5,60})<',
                             resp.text, _re.IGNORECASE
                         )
+                        titles = [t.strip() for t in raw_titles if t.strip().lower() not in _nav_skip and len(t.strip()) > 8]
                         if not titles:
                             # Try h2/h3 tags as job titles
                             titles = _re.findall(r'<h[23][^>]*>([^<]{10,60})</h[23]>', resp.text)

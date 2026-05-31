@@ -377,7 +377,7 @@
             </table>
         </div>
         <p class="text-[10px] text-gray-400 mt-2 px-1">* 6P = average search volume over the last 6 identical reporting periods (e.g. last 6 fortnights for a fortnightly report).</p>
-        {% set ai_prompts = ai_data.get('_ai_prompts', []) | sort(attribute='search_volume', reverse=True) %}
+        {% set ai_prompts = ai_prompts if ai_prompts is defined else ai_data.get('_ai_prompts', []) %}
         {% if ai_prompts %}
         <div class="mt-6 pt-5 border-t border-gray-100">
             <div class="flex items-center gap-2 mb-4">
@@ -512,7 +512,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for kw in keywords %}
+                    {% for kw in (yt_keywords if yt_keywords is defined else keywords) %}
                     {% set yd = yt_data.get(kw, {}) %}
                     <tr class="border-b border-gray-50 hover:bg-red-50/20 transition">
                         <td class="py-3 px-3 font-medium text-gray-800 text-sm">{{ kw }}</td>
@@ -859,7 +859,6 @@
             <div class="flex items-center gap-2 mb-3">
                 <span class="material-symbols-outlined text-[16px] text-blue-600">thumb_up</span>
                 <h3 class="font-semibold text-gray-700 text-sm">Meta Ads (Facebook & Instagram)</h3>
-                {% if manual_meta and not ads_data %}<span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 ml-2">Manually entered</span>{% endif %}
             </div>
             {% set has_meta = namespace(val=false) %}
             {% if ads_data %}{% for key, ad in ads_data.items() %}{% if ad.get('ads') %}{% set has_meta.val = true %}{% endif %}{% endfor %}{% endif %}
@@ -902,6 +901,29 @@
                         {% if ent.get('roas') %}<div class="bg-emerald-50 rounded-lg p-2 text-center"><p class="text-[10px] text-gray-400">ROAS</p><p class="font-bold text-emerald-700 text-xs">{{ ent.get('roas') }}x</p></div>{% endif %}
                     </div>
                     {% if ent.get('notes') %}<p class="text-xs text-gray-400 mt-2">{{ ent.get('notes') }}</p>{% endif %}
+                    {% if ent.get('ads') %}
+                    <div class="mt-3 pt-3 border-t border-gray-100">
+                        <p class="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">Sample Ads</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {% for ad in ent.get('ads', []) %}
+                        <div class="border border-blue-100 rounded-xl overflow-hidden bg-white">
+                            {% if ad.get('image_url') %}
+                            <img src="{{ ad.get('image_url') }}" alt="Ad creative" class="w-full h-28 object-cover bg-gray-100" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="w-full h-28 bg-blue-50 items-center justify-center hidden"><span class="material-symbols-outlined text-4xl text-blue-200">image</span></div>
+                            {% else %}
+                            <div class="w-full h-28 bg-blue-50 flex items-center justify-center"><span class="material-symbols-outlined text-4xl text-blue-200">image</span></div>
+                            {% endif %}
+                            <div class="p-2">
+                                {% if ad.get('link') %}<a href="{{ ad.get('link') }}" target="_blank" class="text-xs font-semibold text-brand hover:underline leading-tight block truncate">{{ ad.get('link') }}</a>{% endif %}
+                                {% if ad.get('started_date') %}<p class="text-[10px] text-gray-400 mt-0.5">Started: {{ ad.get('started_date') }}</p>{% endif %}
+                                {% if ad.get('platforms') %}<p class="text-[10px] text-gray-400 mt-0.5">{{ ad.get('platforms') | join(', ') }}</p>{% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if ent.get('link_to_all_ads') %}<div class="mt-2"><a href="{{ ent.get('link_to_all_ads') }}" target="_blank" class="text-xs text-blue-600 hover:underline">View all Meta Ads →</a></div>{% endif %}
                 </div>
                 {% endif %}
                 {% endfor %}
@@ -917,7 +939,6 @@
             <div class="flex items-center gap-2 mb-3">
                 <span class="material-symbols-outlined text-[16px] text-yellow-500">ads_click</span>
                 <h3 class="font-semibold text-gray-700 text-sm">Google Search Ads</h3>
-                {% if manual_google %}<span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 ml-2">Manually entered</span>{% endif %}
             </div>
             {% set google_ads_data = kw_data.get('google_ads', {}) %}
             {% set has_google = namespace(val=false) %}
@@ -950,6 +971,28 @@
                         {% if ent.get('cost_per_conversion') %}<div class="bg-yellow-50 rounded-lg p-2 text-center"><p class="text-[10px] text-gray-400">Cost/Conv</p><p class="font-bold text-gray-800 text-xs">${{ ent.get('cost_per_conversion') }}</p></div>{% endif %}
                     </div>
                     {% if ent.get('notes') %}<p class="text-xs text-gray-400 mt-2">{{ ent.get('notes') }}</p>{% endif %}
+                    {% if ent.get('ads') %}
+                    <div class="mt-3 pt-3 border-t border-gray-100">
+                        <p class="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">Sample Ads</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {% for ad in ent.get('ads', []) %}
+                        <div class="border border-yellow-100 rounded-xl overflow-hidden bg-white">
+                            {% if ad.get('image_url') %}
+                            <img src="{{ ad.get('image_url') }}" alt="Ad creative" class="w-full h-28 object-cover bg-gray-100" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="w-full h-28 bg-yellow-50 items-center justify-center hidden"><span class="material-symbols-outlined text-4xl text-yellow-200">image</span></div>
+                            {% else %}
+                            <div class="w-full h-28 bg-yellow-50 flex items-center justify-center"><span class="material-symbols-outlined text-4xl text-yellow-200">image</span></div>
+                            {% endif %}
+                            <div class="p-2">
+                                {% if ad.get('link') %}<a href="{{ ad.get('link') }}" target="_blank" class="text-xs font-semibold text-brand hover:underline leading-tight block truncate">{{ ad.get('link') }}</a>{% endif %}
+                                {% if ad.get('last_shown') %}<p class="text-[10px] text-gray-400 mt-0.5">Last shown: {{ ad.get('last_shown') }}</p>{% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if ent.get('link_to_all_ads') %}<div class="mt-2"><a href="{{ ent.get('link_to_all_ads') }}" target="_blank" class="text-xs text-yellow-600 hover:underline">View all Google Ads →</a></div>{% endif %}
                 </div>
                 {% endif %}
                 {% endfor %}
@@ -1002,8 +1045,13 @@
                 {% set wj = jd.get('website_jobs', {}) %}
                 <div class="mt-3 pt-3 border-t border-gray-100">
                     <p class="text-xs font-semibold text-gray-500 mb-2">Also on company website <a href="{{ wj.get('careers_url', '#') }}" target="_blank" class="text-brand hover:underline ml-1">{{ wj.get('careers_url', '') }}</a></p>
-                    {% for title in wj.get('job_titles', [])[:5] %}
+                    {% set nav_skip = ['about us','about','home','contact','contact us','careers','jobs','how we hire','life at','our team','team','blog','news','services','products','solutions','login','sign in','sign up','get started','privacy policy','terms','faq','support','menu','navigation'] %}
+                    {% set shown_jobs = namespace(count=0) %}
+                    {% for title in wj.get('job_titles', []) %}
+                    {% if shown_jobs.count < 5 and title | unescape | lower not in nav_skip and (title | unescape | lower)[:7] != 'life at' %}
+                    {% set shown_jobs.count = shown_jobs.count + 1 %}
                     <div class="text-xs text-gray-600 py-1 border-b border-gray-50">{{ title | unescape }}</div>
+                    {% endif %}
                     {% endfor %}
                 </div>
                 {% endif %}
@@ -1019,17 +1067,28 @@
        SECTION: REVIEWS
     ═══════════════════════════════════════ #}
     {% set reviews_data = kw_data.get('reviews', {}) %}
-    {% if reviews_data %}
+    {% set manual_reviews_list = manual.get('reviews', []) %}
     {% set has_reviews = namespace(val=false) %}
-    {% for key, rd in reviews_data.items() %}{% if rd.get('reviews') or rd.get('avg_rating') %}{% set has_reviews.val = true %}{% endif %}{% endfor %}
-    {% if has_reviews.val %}
+    {% if reviews_data %}{% for key, rd in reviews_data.items() %}{% if rd.get('reviews') or rd.get('avg_rating') %}{% set has_reviews.val = true %}{% endif %}{% endfor %}{% endif %}
+    {% if manual_reviews_list %}{% for mr in manual_reviews_list %}{% if mr.get('avg_rating') or mr.get('reviews') or mr.get('total_reviews') %}{% set has_reviews.val = true %}{% endif %}{% endfor %}{% endif %}
+    {% if has_reviews.val or not portal_token %}
     <div class="glass-card rounded-2xl border border-gray-100 p-6 mb-6">
-        <div class="flex items-center gap-2 mb-5">
-            <span class="material-symbols-outlined text-yellow-500 text-[22px]">star</span>
-            <h2 class="text-lg font-semibold text-gray-800">Reviews</h2>
+        <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-yellow-500 text-[22px]">star</span>
+                <h2 class="text-lg font-semibold text-gray-800">Reviews</h2>
+            </div>
+            {% if not portal_token %}
+            <button onclick="document.getElementById('reviewsModal').classList.remove('hidden')" class="text-xs text-yellow-600 border border-yellow-200 rounded-lg px-3 py-1.5 hover:bg-yellow-500 hover:text-white transition flex items-center gap-1">
+                <span class="material-symbols-outlined text-[14px]">edit</span> Edit Reviews
+            </button>
+            {% endif %}
         </div>
+        {% set shown_rev_entities = namespace(names=[]) %}
+        {% if reviews_data %}
         {% for key, rd in reviews_data.items() %}
         {% if rd.get('reviews') or rd.get('avg_rating') %}
+        {% set shown_rev_entities.names = shown_rev_entities.names + [rd.get('entity_name', key)|lower] %}
         <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="font-semibold text-gray-700 text-sm">
@@ -1046,7 +1105,7 @@
             <div class="space-y-2">
                 {% for review in rd.get('reviews', [])[:5] %}
                 <div class="p-2.5 bg-yellow-50/40 rounded-lg border border-yellow-100 text-xs text-gray-600">
-                    {% if review.get('rating') %}<span class="text-yellow-500 mr-1">{% for i in range(review.get('rating', 0)|int) %}★{% endfor %}</span>{% endif %}
+                    {% if review.get('rating') %}<span class="text-yellow-500 mr-1">{% for star in range(review.get('rating', 0)|int) %}★{% endfor %}</span>{% endif %}
                     "{{ review.get('text', '')[:200] }}"
                 </div>
                 {% endfor %}
@@ -1054,8 +1113,42 @@
         </div>
         {% endif %}
         {% endfor %}
+        {% endif %}
+        {% for mr in manual_reviews_list %}
+        {% if mr.get('entity') and mr.get('entity')|lower not in shown_rev_entities.names %}
+        {% if mr.get('avg_rating') or mr.get('reviews') or mr.get('total_reviews') %}
+        <div class="mb-4 pb-4 border-b border-gray-100 last:border-0">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-gray-700 text-sm">
+                    {% if mr.get('type') == 'client' %}🏢{% else %}🏬{% endif %}
+                    {{ mr.get('entity') }}
+                    {% if mr.get('platform') %}<span class="text-xs font-normal text-gray-400 ml-1">via {{ mr.get('platform') }}</span>{% endif %}
+                    <span class="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full border border-amber-100 ml-1">manual</span>
+                </h3>
+                <div class="flex items-center gap-3 text-xs text-gray-500">
+                    {% if mr.get('avg_rating') %}<span class="text-yellow-500 font-bold">★ {{ mr.get('avg_rating') }}</span>{% endif %}
+                    {% if mr.get('total_reviews', 0) > 0 %}<span>{{ mr.get('total_reviews') }} reviews</span>{% endif %}
+                    {% if mr.get('review_url') %}<a href="{{ mr.get('review_url') }}" target="_blank" class="text-brand hover:underline">View all →</a>{% endif %}
+                </div>
+            </div>
+            {% if mr.get('reviews') %}
+            <div class="space-y-2">
+                {% for review in mr.get('reviews', [])[:5] %}
+                <div class="p-2.5 bg-yellow-50/40 rounded-lg border border-yellow-100 text-xs text-gray-600">
+                    {% if review.get('rating') %}<span class="text-yellow-500 mr-1">{% for star in range(review.get('rating', 0)|int) %}★{% endfor %}</span>{% endif %}
+                    "{{ review.get('text', '')[:200] }}"
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endif %}
+        {% endfor %}
+        {% if not has_reviews.val %}
+        <p class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">No reviews data yet. Click "Edit Reviews" above to enter it manually.</p>
+        {% endif %}
     </div>
-    {% endif %}
     {% endif %}
 
     {% endif %}{# end complete/failed #}
@@ -1221,7 +1314,8 @@
       <div class="mb-4"><label class="text-xs font-medium text-gray-600 block mb-1">Period (e.g. April 2026)</label>
         <input type="text" name="period" value="{{ mm.get('period','') }}" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
       <div class="space-y-4">
-        {% for row in ns_me.rows %}
+        {% for i in range(ns_me.rows|length) %}
+        {% set row = ns_me.rows[i] %}
         {% set saved = {} %}
         {% for e in mm_entities %}{% if e.get('entity') == row.entity %}{% set saved = e %}{% endif %}{% endfor %}
         <div class="border border-gray-100 rounded-xl p-4 {% if row.type == 'client' %}bg-brand/5{% else %}bg-gray-50{% endif %}">
@@ -1239,6 +1333,30 @@
             <div><label class="text-[10px] text-gray-400 block mb-0.5">ROAS</label><input type="text" name="meta_roas[]" value="{{ saved.get('roas','') }}" placeholder="e.g. 3.2" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
           </div>
           <div class="mt-2"><label class="text-[10px] text-gray-400 block mb-0.5">Notes</label><input type="text" name="meta_notes[]" value="{{ saved.get('notes','') }}" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          <div class="mt-3 pt-3 border-t border-gray-100">
+            <p class="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">Sample Ads (up to 5)</p>
+            {% for j in range(5) %}
+            {% set sv_ad = saved.get('ads', [])[j] if j < (saved.get('ads', []) | length) else {} %}
+            {% set saved_platforms = sv_ad.get('platforms', []) %}
+            <div class="border border-gray-100 rounded-lg p-2 mb-2 bg-gray-50/50">
+              <p class="text-[10px] text-gray-400 font-medium mb-1.5">Ad {{ j + 1 }}</p>
+              <div class="grid grid-cols-12 gap-1.5 mb-1.5 items-center">
+                <div class="col-span-4"><input type="text" name="meta_ad_image_{{ i }}_{{ j }}" value="{{ sv_ad.get('image_url','') }}" placeholder="Image URL" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+                <div class="col-span-4"><input type="text" name="meta_ad_link_{{ i }}_{{ j }}" value="{{ sv_ad.get('link','') }}" placeholder="Ad Link" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+                <div class="col-span-4"><input type="text" name="meta_ad_started_{{ i }}_{{ j }}" value="{{ sv_ad.get('started_date','') }}" placeholder="Started Date" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                {% for plat in ['Facebook', 'Instagram', 'Audience Network', 'WhatsApp', 'Threads'] %}
+                <label class="flex items-center gap-1 text-[11px] text-gray-600 cursor-pointer">
+                  <input type="checkbox" name="meta_ad_platforms_{{ i }}_{{ j }}[]" value="{{ plat }}" {% if plat in saved_platforms %}checked{% endif %} class="rounded">
+                  {{ plat }}
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+            <div class="mt-2"><label class="text-[10px] text-gray-400 block mb-0.5">Link to all Meta Ads</label><input type="text" name="meta_link_to_all[]" value="{{ saved.get('link_to_all_ads','') }}" placeholder="https://..." class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          </div>
         </div>
         {% endfor %}
       </div>
@@ -1266,7 +1384,8 @@
       <div class="mb-4"><label class="text-xs font-medium text-gray-600 block mb-1">Period (e.g. April 2026)</label>
         <input type="text" name="period" value="{{ mg.get('period','') }}" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></div>
       <div class="space-y-4">
-        {% for row in ns_ge.rows %}
+        {% for i in range(ns_ge.rows|length) %}
+        {% set row = ns_ge.rows[i] %}
         {% set saved = {} %}
         {% for e in mg_entities %}{% if e.get('entity') == row.entity %}{% set saved = e %}{% endif %}{% endfor %}
         <div class="border border-gray-100 rounded-xl p-4 {% if row.type == 'client' %}bg-yellow-50/50{% else %}bg-gray-50{% endif %}">
@@ -1283,6 +1402,18 @@
             <div><label class="text-[10px] text-gray-400 block mb-0.5">Cost/Conv ($)</label><input type="text" name="g_cpa[]" value="{{ saved.get('cost_per_conversion','') }}" placeholder="e.g. 42.86" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
           </div>
           <div class="mt-2"><label class="text-[10px] text-gray-400 block mb-0.5">Notes</label><input type="text" name="g_notes[]" value="{{ saved.get('notes','') }}" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          <div class="mt-3 pt-3 border-t border-gray-100">
+            <p class="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">Sample Ads (up to 5)</p>
+            {% for j in range(5) %}
+            {% set sv_gad = saved.get('ads', [])[j] if j < (saved.get('ads', []) | length) else {} %}
+            <div class="grid grid-cols-12 gap-1.5 mb-1.5 items-center">
+              <div class="col-span-4"><input type="text" name="g_ad_image_{{ i }}_{{ j }}" value="{{ sv_gad.get('image_url','') }}" placeholder="Image URL" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+              <div class="col-span-4"><input type="text" name="g_ad_link_{{ i }}_{{ j }}" value="{{ sv_gad.get('link','') }}" placeholder="Ad Link" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+              <div class="col-span-4"><input type="text" name="g_ad_last_shown_{{ i }}_{{ j }}" value="{{ sv_gad.get('last_shown','') }}" placeholder="Last Shown Date" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+            </div>
+            {% endfor %}
+            <div class="mt-2"><label class="text-[10px] text-gray-400 block mb-0.5">Link to all Google Ads</label><input type="text" name="g_link_to_all[]" value="{{ saved.get('link_to_all_ads','') }}" placeholder="https://..." class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          </div>
         </div>
         {% endfor %}
       </div>
@@ -1337,6 +1468,55 @@
       <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
         <button type="button" onclick="document.getElementById('ytChannelsModal').classList.add('hidden')" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">Cancel</button>
         <button type="submit" class="px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition">Save Channel Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── REVIEWS MANUAL DATA MODAL ── #}
+<div id="reviewsModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8">
+    <div class="flex items-center justify-between p-6 border-b border-gray-100">
+      <h3 class="font-semibold text-gray-800">Edit Reviews Data — Per Entity</h3>
+      <button onclick="document.getElementById('reviewsModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    {% set mrev = report.get_manual_data().get('reviews', []) %}
+    {% set ns_rev = namespace(rows=[{'entity': client.name, 'type': 'client'}]) %}
+    {% for comp in client.competitors %}{% set ns_rev.rows = ns_rev.rows + [{'entity': comp.name, 'type': 'competitor'}] %}{% endfor %}
+    <form method="post" action="/reports/{{ report.id }}/manual-data" class="p-6">
+      <input type="hidden" name="section" value="reviews">
+      <p class="text-xs text-gray-400 mb-5">Enter review data for each entity. Leave blank to skip. Up to 5 review snippets per entity.</p>
+      <div class="space-y-6">
+        {% for i in range(ns_rev.rows|length) %}
+        {% set row = ns_rev.rows[i] %}
+        {% set saved_rev = {} %}
+        {% for r in mrev %}{% if r.get('entity') == row.entity %}{% set saved_rev = r %}{% endif %}{% endfor %}
+        <div class="border border-gray-100 rounded-xl p-4 {% if row.type == 'client' %}bg-yellow-50/30{% else %}bg-gray-50{% endif %}">
+          <p class="text-xs font-bold text-gray-700 mb-3">{% if row.type == 'client' %}🏢{% else %}🏬{% endif %} {{ row.entity }}</p>
+          <input type="hidden" name="rev_entity_name[]" value="{{ row.entity }}">
+          <input type="hidden" name="rev_entity_type[]" value="{{ row.type }}">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            <div><label class="text-[10px] text-gray-400 block mb-0.5">Platform</label><input type="text" name="rev_platform[]" value="{{ saved_rev.get('platform','') }}" placeholder="e.g. Trustpilot" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+            <div class="md:col-span-3"><label class="text-[10px] text-gray-400 block mb-0.5">Review Page URL</label><input type="text" name="rev_url[]" value="{{ saved_rev.get('review_url','') }}" placeholder="https://..." class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div><label class="text-[10px] text-gray-400 block mb-0.5">Avg Rating (e.g. 4.2)</label><input type="text" name="rev_avg_rating[]" value="{{ saved_rev.get('avg_rating','') }}" placeholder="e.g. 4.2" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+            <div><label class="text-[10px] text-gray-400 block mb-0.5">Total Reviews</label><input type="text" name="rev_total[]" value="{{ saved_rev.get('total_reviews','') }}" placeholder="e.g. 1234" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"></div>
+          </div>
+          <p class="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">Review Snippets (up to 5) — Stars / Text</p>
+          {% for j in range(5) %}
+          {% set sv_r = saved_rev.get('reviews', [])[j] if j < (saved_rev.get('reviews', []) | length) else {} %}
+          <div class="grid grid-cols-12 gap-1.5 mb-1.5 items-center">
+            <div class="col-span-2"><input type="number" name="rev_rating_{{ i }}_{{ j }}" value="{{ sv_r.get('rating','') }}" placeholder="1-5" min="1" max="5" class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+            <div class="col-span-10"><input type="text" name="rev_text_{{ i }}_{{ j }}" value="{{ sv_r.get('text','') }}" placeholder="Review snippet text..." class="w-full border border-gray-200 rounded-lg px-2 py-1 text-[11px]"></div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+        <button type="button" onclick="document.getElementById('reviewsModal').classList.add('hidden')" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">Cancel</button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-yellow-500 text-white text-sm font-medium hover:bg-yellow-600 transition">Save Reviews Data</button>
       </div>
     </form>
   </div>
